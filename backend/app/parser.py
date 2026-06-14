@@ -1,0 +1,246 @@
+from __future__ import annotations
+
+import re
+from typing import Any
+
+
+BRANDS = [
+    "Beelink",
+    "Minisforum",
+    "GMKtec",
+    "Geekom",
+    "Chuwi",
+    "Lenovo",
+    "HP",
+    "Dell",
+    "Shuttle",
+    "NiPoGi",
+    "Acemagic",
+    "Ace Magician",
+    "Intel",
+    "MSI",
+    "Schneider",
+]
+
+CPU_ALIASES = {
+    "RYZEN 7 5700U": "Ryzen 7 5700U",
+    "RYZEN 7 5800H": "Ryzen 7 5800H",
+    "RYZEN 7 5800U": "Ryzen 7 5800U",
+    "RYZEN 7 8700G": "Ryzen 7 8700G",
+    "RYZEN 7 H255": "Ryzen 7 H255",
+    "RYZEN 7 6800U": "Ryzen 7 6800U",
+    "RYZEN 9 6900HX": "Ryzen 9 6900HX",
+    "RYZEN 7 7735HS": "Ryzen 7 7735HS",
+    "RYZEN 7 8745HS": "Ryzen 7 8745HS",
+    "RYZEN 5 7430U": "Ryzen 5 7430U",
+    "RYZEN 5 5500U": "Ryzen 5 5500U",
+    "RYZEN 5 5650GE": "Ryzen 5 5650GE",
+    "I5 6500T": "Intel i5-6500T",
+    "I5 7500": "Intel i5-7500",
+    "I5 8500T": "Intel i5-8500T",
+    "I5 9500": "Intel i5-9500",
+    "I5 1135G7": "Intel i5-1135G7",
+    "I5 12400": "Intel i5-12400",
+    "I5 1235U": "Intel i5-1235U",
+    "I5 1250P": "Intel i5-1250P",
+    "N100": "Intel N100",
+    "N150": "Intel N150",
+    "N4000": "Intel N4000",
+    "I7 6700HQ": "Intel i7-6700HQ",
+    "G630": "Intel G630",
+    "A10": "AMD A10",
+}
+
+
+def normalize_text(*parts: Any) -> str:
+    text = " ".join(str(part or "") for part in parts)
+    text = text.replace("\u00a0", " ")
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def parse_price(value: Any, text: str = "") -> int | None:
+    if isinstance(value, (int, float)):
+        return int(value)
+
+    source = normalize_text(value, text)
+    matches = re.findall(r"(\d[\d\s.,]{0,8})\s*(?:EUR|€|euros?)", source, re.I)
+    if not matches:
+        return None
+
+    cleaned = re.sub(r"[^\d]", "", matches[0])
+    return int(cleaned) if cleaned else None
+
+
+def extract_brand(text: str) -> str | None:
+    for brand in BRANDS:
+        if re.search(rf"\b{re.escape(brand)}\b", text, re.I):
+            return "Acemagic" if brand == "Ace Magician" else brand
+    return None
+
+
+def extract_cpu(text: str) -> str | None:
+    upper = text.upper()
+    upper = re.sub(r"[-_/]+", " ", upper)
+    upper = re.sub(r"\s+", " ", upper)
+
+    for key, label in CPU_ALIASES.items():
+        if re.search(rf"\b{re.escape(key)}\b", upper):
+            return label
+
+    if re.search(r"\b8745HS\b", upper):
+        return "Ryzen 7 8745HS"
+    if re.search(r"\bUM690\b", upper) and re.search(r"\bRYZEN\s*9\b", upper):
+        return "Ryzen 9 6900HX"
+
+    ryzen = re.search(r"\bRYZEN\s*([3579])\s*((?:\d{4}|H\s*\d{3})[A-Z]{0,2})\b", upper)
+    if ryzen:
+        return f"Ryzen {ryzen.group(1)} {ryzen.group(2).replace(' ', '')}"
+
+    ryzen_family = re.search(r"\bRYZEN\s*([3579])\b", upper)
+    if ryzen_family:
+        return f"Ryzen {ryzen_family.group(1)} unknown"
+
+    intel_gen = re.search(r"\b(?:INTEL\s*)?I([357])\s*(\d{1,2})(?:TH)?\s*(?:GEN)?\b", upper)
+    if intel_gen and int(intel_gen.group(2)) <= 14:
+        return f"Intel i{intel_gen.group(1)}-{intel_gen.group(2)}th gen"
+
+    intel_core = re.search(r"\b(?:INTEL\s*)?I\s*\.?\s*([357])\s*(\d{4,5}[A-Z]{0,2})\b", upper)
+    if intel_core:
+        return f"Intel i{intel_core.group(1)}-{intel_core.group(2)}"
+
+    split_intel_core = re.search(r"\bI\s*\.?\s*([357])\b.{0,12}\b(\d{4,5}[A-Z]{0,2})\b", upper)
+    if split_intel_core:
+        return f"Intel i{split_intel_core.group(1)}-{split_intel_core.group(2)}"
+
+    intel_n = re.search(r"\b(?:INTEL\s*)?N(100|150|4000)\b", upper)
+    if intel_n:
+        return f"Intel N{intel_n.group(1)}"
+
+    pentium = re.search(r"\b(?:INTEL\s*)?G(630)\b", upper)
+    if pentium:
+        return f"Intel G{pentium.group(1)}"
+
+    return None
+
+
+def extract_ram_gb(text: str) -> int | None:
+    candidates: list[int] = []
+
+    for left, right in re.findall(r"\b(\d{1,2})\s*x\s*(\d{1,2})\b", text, re.I):
+        candidates.append(int(left) * int(right))
+
+    for match in re.finditer(r"\b(\d{1,3})\s*(?:GO|GB)\b", text, re.I):
+        before = text[max(0, match.start() - 24) : match.start()]
+        after = text[match.end() : min(len(text), match.end() + 10)]
+        gb = int(match.group(1))
+        storage_before = r"\b(SSD|NVME|HDD|STOCKAGE|DISQUE|STORAGE|ROM|EMMC|SATA|M\.2|M2|DD)\s*(?::|de|d\'|avec|en)?\s*$"
+        storage_after = r"^\s*(SSD|NVME|HDD|ROM|EMMC|SATA|M\.2|M2|DD)\b"
+        if re.search(storage_before, before, re.I) or (gb >= 64 and re.search(storage_after, after, re.I)):
+            continue
+        if 2 <= gb <= 128:
+            candidates.append(gb)
+
+    return max(candidates) if candidates else None
+
+
+def _size_to_gb(value: str, unit: str) -> int:
+    number = float(value.replace(",", "."))
+    normalized_unit = unit.lower()
+    if normalized_unit.startswith("t"):
+        return int(number * 1024)
+    return int(number)
+
+
+def extract_storage(text: str) -> dict[str, Any]:
+    candidates = []
+    storage_words = r"SSD|NVME|NVM\s*E|M\.2|M2|HDD|EMMC|SATA|STOCKAGE|DISQUE|STORAGE|ROM|FLASH|DRIVE|DD"
+    ram_words = r"RAM|DDR\d?|MEMOIRE|MÉMOIRE|MEMORY|BARRETTE|SO\s*DIMM|SODIMM"
+    size_pattern = re.compile(r"\b(\d+(?:[,.]\d+)?)\s*(TO|TB|GO|GB)\b", re.I)
+
+    for match in size_pattern.finditer(text):
+        value, unit = match.groups()
+        size_gb = _size_to_gb(value, unit)
+        if not 32 <= size_gb <= 8192:
+            continue
+
+        before = text[max(0, match.start() - 40) : match.start()]
+        after = text[match.end() : min(len(text), match.end() + 28)]
+        context = f"{before} {after}"
+        nearest_before = re.search(rf"\b({storage_words})\s*(?::|de|d\'|avec|en)?\s*$", before, re.I)
+        nearest_after = re.search(rf"^\s*(?:[:/+-]\s*)?({storage_words})\b", after, re.I)
+
+        if nearest_before:
+            token = nearest_before.group(1)
+        elif nearest_after:
+            token = nearest_after.group(1)
+        else:
+            # Bare capacities like "16 Go 512 Go" or "Samsung 990 Pro 1To"
+            # are common. Ignore RAM-sized bare values, but keep storage-sized ones
+            # even when DDR/RAM appears elsewhere in the same title.
+            if size_gb < 128:
+                continue
+            token = "SSD"
+
+        kind = _storage_kind_from_token(token.upper().replace(" ", ""))
+        confidence = 3 if nearest_before or nearest_after else 1
+        if re.search(r"\bEMMC\b", context, re.I):
+            kind = "eMMC"
+            confidence += 1
+        if re.search(r"\b(NVME|NVM\s*E|M\.2|M2)\b", context, re.I):
+            if kind == "SSD":
+                kind = "NVMe"
+            confidence += 1
+        if re.search(r"\b(SSD|NVME|NVM\s*E|M\.2|M2)\b", context, re.I):
+            confidence += 1
+
+        candidates.append({"type": kind, "size_gb": size_gb, "confidence": confidence})
+
+    if not candidates:
+        return {"type": None, "size_gb": None, "label": None}
+
+    best = max(candidates, key=lambda item: (item["size_gb"], item["confidence"]))
+    label_size = f"{best['size_gb'] // 1024} To" if best["size_gb"] >= 1024 and best["size_gb"] % 1024 == 0 else f"{best['size_gb']} Go"
+    return {"type": best["type"], "size_gb": best["size_gb"], "label": f"{best['type']} {label_size}"}
+
+
+def _storage_kind_from_token(token: str) -> str:
+    if token in {"NVME", "NVME", "M.2", "M2"}:
+        return "NVMe"
+    if token in {"HDD", "DD"}:
+        return "HDD"
+    if token == "EMMC":
+        return "eMMC"
+    return "SSD"
+
+def extract_model(title: str, brand: str | None, cpu: str | None) -> str | None:
+    model = title or ""
+    if brand:
+        model = re.sub(rf"\b{re.escape(brand)}\b", "", model, flags=re.I)
+    if cpu:
+        cpu_token = re.escape(cpu.replace("Intel ", "").replace("-", " "))
+        model = re.sub(cpu_token, "", model, flags=re.I)
+    model = re.sub(r"\b(mini\s*pc|pc|ordinateur|ryzen|intel)\b", "", model, flags=re.I)
+    model = re.sub(r"\b\d+\s*(go|gb|to|tb)\b", "", model, flags=re.I)
+    model = re.sub(r"\s+", " ", model).strip(" -,:")
+    return model[:80] or None
+
+
+def parse_listing(title: str, price: Any = None, description: str = "") -> dict[str, Any]:
+    text = normalize_text(title, price if isinstance(price, str) else "", description)
+    brand = extract_brand(text)
+    cpu = extract_cpu(text)
+    ram_gb = extract_ram_gb(text)
+    storage = extract_storage(text)
+    parsed_price = parse_price(price, text)
+
+    return {
+        "brand": brand,
+        "model": extract_model(title, brand, cpu),
+        "cpu": cpu,
+        "ram_gb": ram_gb,
+        "storage_type": storage["type"],
+        "storage_gb": storage["size_gb"],
+        "storage_label": storage["label"],
+        "price": parsed_price,
+        "raw": {"title": title, "description": description},
+    }

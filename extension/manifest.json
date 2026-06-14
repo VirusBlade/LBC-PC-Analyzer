@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "LBC Mini-PC Analyzer",
+  "version": "0.3.0",
+  "description": "Analyse localement les annonces Leboncoin de mini-PC.",
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "http://localhost:8000/*",
+    "https://www.leboncoin.fr/*",
+    "https://leboncoin.fr/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.leboncoin.fr/*",
+        "https://leboncoin.fr/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "css": [
+        "styles.css"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}
