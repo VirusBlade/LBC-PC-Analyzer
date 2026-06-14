@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import threading
+import time
 from typing import Union
 
 from fastapi import FastAPI
@@ -8,7 +10,7 @@ from pydantic import BaseModel
 
 from .parser import parse_listing
 from .scoring import score_listing
-from .learning import get_examples, get_stats, get_suggestions, init_db, record_observation
+from .learning import AUTO_LEARN_INTERVAL_SECONDS, apply_learned_rules, auto_learn, get_examples, get_learned_cpu_scores, get_learned_rules, get_stats, get_suggestions, init_db, record_observation
 
 
 app = FastAPI(title="LBC Mini-PC Analyzer", version="0.2.0")
@@ -39,6 +41,20 @@ class ObserveRequest(BaseModel):
 @app.on_event("startup")
 def startup() -> None:
     init_db()
+    start_auto_learning_worker()
+
+
+def start_auto_learning_worker() -> None:
+    def worker() -> None:
+        while True:
+            time.sleep(AUTO_LEARN_INTERVAL_SECONDS)
+            try:
+                auto_learn()
+            except Exception:
+                pass
+
+    thread = threading.Thread(target=worker, daemon=True, name="lbc-auto-learning")
+    thread.start()
 
 
 @app.get("/health")
@@ -49,7 +65,8 @@ def health() -> dict[str, str]:
 @app.post("/analyze")
 def analyze(payload: AnalyzeRequest) -> dict:
     parsed = parse_listing(payload.title, payload.price, payload.description)
-    scoring = score_listing(parsed)
+    parsed = apply_learned_rules(parsed, f"{payload.title} {payload.description}")
+    scoring = score_listing(parsed, learned_cpu_scores=get_learned_cpu_scores())
     result = {**parsed, **scoring}
     record_observation(payload.dict(), result, payload.url)
     return result
@@ -73,3 +90,13 @@ def learning_examples(flag: Union[str, None] = None, limit: int = 30) -> dict:
 @app.get("/learning/suggestions")
 def learning_suggestions(limit: int = 30) -> dict:
     return get_suggestions(limit=limit)
+
+
+@app.post("/learning/auto-run")
+def learning_auto_run() -> dict:
+    return auto_learn()
+
+
+@app.get("/learning/rules")
+def learning_rules() -> dict:
+    return get_learned_rules()

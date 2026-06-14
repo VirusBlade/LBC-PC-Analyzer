@@ -108,9 +108,10 @@ def _verdict(score: int) -> str:
     return "À éviter"
 
 
-def score_listing(parsed: dict[str, Any]) -> dict[str, Any]:
+def score_listing(parsed: dict[str, Any], learned_cpu_scores: dict[str, int] | None = None) -> dict[str, Any]:
     cpu = parsed.get("cpu")
-    cpu_score = CPU_TABLE.get(cpu, 35)
+    cpu_scores = {**CPU_TABLE, **(learned_cpu_scores or {})}
+    cpu_score = cpu_scores.get(cpu, 35)
     ram_score = _ram_score(parsed.get("ram_gb"))
     storage_score = _storage_score(parsed.get("storage_gb"), parsed.get("storage_type"))
     price_score = _price_score(parsed.get("price"), cpu_score, parsed.get("ram_gb"), parsed.get("storage_gb"))

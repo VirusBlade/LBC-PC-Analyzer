@@ -29,6 +29,27 @@ def init_db() -> None:
         )
         conn.execute("CREATE INDEX IF NOT EXISTS idx_observations_created_at ON observations(created_at)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_observations_score ON observations(score)")
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS learned_cpu (
+                pattern TEXT PRIMARY KEY,
+                label TEXT NOT NULL,
+                score INTEGER NOT NULL,
+                seen_count INTEGER NOT NULL,
+                updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS learned_brand (
+                pattern TEXT PRIMARY KEY,
+                label TEXT NOT NULL,
+                seen_count INTEGER NOT NULL,
+                updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
 
 
 def record_observation(payload: dict[str, Any], result: dict[str, Any], url: str | None = None) -> dict[str, Any]:
@@ -234,3 +255,163 @@ def _bump(bucket: dict[str, dict[str, Any]], key: str, title: str) -> None:
 
 def _top(bucket: dict[str, dict[str, Any]], limit: int) -> list[dict[str, Any]]:
     return sorted(bucket.values(), key=lambda item: item["count"], reverse=True)[:limit]
+
+AUTO_LEARN_INTERVAL_SECONDS = 300
+MIN_CPU_OCCURRENCES = 2
+
+
+def auto_learn() -> dict[str, Any]:
+    init_db()
+    suggestions = get_suggestions(limit=100)
+    learned = {"cpu": [], "brand": []}
+
+    with sqlite3.connect(DB_PATH) as conn:
+        for item in suggestions["cpu_candidates"]:
+            if item["count"] < MIN_CPU_OCCURRENCES:
+                continue
+            label = _normalize_cpu_label(item["value"])
+            score = _estimate_cpu_score(label)
+            if not label or score is None:
+                continue
+            conn.execute(
+                """
+                INSERT INTO learned_cpu (pattern, label, score, seen_count)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(pattern) DO UPDATE SET
+                    label = excluded.label,
+                    score = excluded.score,
+                    seen_count = excluded.seen_count,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                (item["value"].upper(), label, score, item["count"]),
+            )
+            learned["cpu"].append({"pattern": item["value"], "label": label, "score": score, "count": item["count"]})
+
+        for item in suggestions["brand_candidates"]:
+            if item["count"] < 3:
+                continue
+            brand = item["value"].strip()
+            if len(brand) < 3 or any(char.isdigit() for char in brand):
+                continue
+            conn.execute(
+                """
+                INSERT INTO learned_brand (pattern, label, seen_count)
+                VALUES (?, ?, ?)
+                ON CONFLICT(pattern) DO UPDATE SET
+                    label = excluded.label,
+                    seen_count = excluded.seen_count,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                (brand.upper(), brand, item["count"]),
+            )
+            learned["brand"].append({"pattern": brand, "label": brand, "count": item["count"]})
+
+    return learned
+
+
+def apply_learned_rules(parsed: dict[str, Any], text: str) -> dict[str, Any]:
+    init_db()
+    updated = dict(parsed)
+    upper = text.upper()
+
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        if not updated.get("cpu"):
+            for row in conn.execute("SELECT pattern, label FROM learned_cpu ORDER BY seen_count DESC"):
+                if row["pattern"] in upper:
+                    updated["cpu"] = row["label"]
+                    break
+        if not updated.get("brand"):
+            for row in conn.execute("SELECT pattern, label FROM learned_brand ORDER BY seen_count DESC"):
+                if row["pattern"] in upper:
+                    updated["brand"] = row["label"]
+                    break
+
+    return updated
+
+
+def get_learned_cpu_scores() -> dict[str, int]:
+    init_db()
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute("SELECT label, score FROM learned_cpu").fetchall()
+    return {row["label"]: row["score"] for row in rows}
+
+
+def get_learned_rules() -> dict[str, Any]:
+    init_db()
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        cpus = conn.execute("SELECT pattern, label, score, seen_count, updated_at FROM learned_cpu ORDER BY seen_count DESC").fetchall()
+        brands = conn.execute("SELECT pattern, label, seen_count, updated_at FROM learned_brand ORDER BY seen_count DESC").fetchall()
+    return {"cpu": [_row_to_dict(row) for row in cpus], "brand": [_row_to_dict(row) for row in brands]}
+
+
+def _normalize_cpu_label(value: str) -> str | None:
+    import re
+
+    upper = " ".join(value.upper().replace(".", " ").replace("-", " ").split())
+    ryzen = re.search(r"\bRYZEN\s+([3579])\s+((?:\d{4}|H\s*\d{3})[A-Z]{0,2})\b", upper)
+    if ryzen:
+        return f"Ryzen {ryzen.group(1)} {ryzen.group(2).replace(' ', '')}"
+    intel_core = re.search(r"\bI([3579])\s*(\d{4,5}[A-Z]{0,2})\b", upper)
+    if intel_core:
+        return f"Intel i{intel_core.group(1)}-{intel_core.group(2)}"
+    intel_gen = re.search(r"\bI([3579])\s*(\d{1,2})(?:TH)?\s*GEN\b", upper)
+    if intel_gen:
+        return f"Intel i{intel_gen.group(1)}-{intel_gen.group(2)}th gen"
+    intel_n = re.search(r"\bN(\d{3,4})\b", upper)
+    if intel_n:
+        return f"Intel N{intel_n.group(1)}"
+    celeron = re.search(r"\bCELERON\s+([A-Z]?\d{3,5})\b", upper)
+    if celeron:
+        return f"Intel Celeron {celeron.group(1)}"
+    pentium = re.search(r"\bPENTIUM\s+([A-Z]?\d{3,5})\b", upper)
+    if pentium:
+        return f"Intel Pentium {pentium.group(1)}"
+    return None
+
+
+def _estimate_cpu_score(label: str) -> int | None:
+    import re
+
+    if label.startswith("Ryzen"):
+        model = re.search(r"(\d{4})", label)
+        if not model:
+            return None
+        number = int(model.group(1))
+        if number >= 8700:
+            return 95
+        if number >= 7700:
+            return 90
+        if number >= 6800:
+            return 86
+        if number >= 5800:
+            return 79
+        if number >= 5500:
+            return 66
+        return 55
+    if label.startswith("Intel i"):
+        model = re.search(r"-(\d{4,5})", label)
+        if model:
+            number = int(model.group(1)[:2]) if len(model.group(1)) >= 5 else int(model.group(1)[0])
+            if number >= 13:
+                return 82
+            if number >= 12:
+                return 74
+            if number >= 11:
+                return 62
+            if number >= 10:
+                return 48
+            if number >= 8:
+                return 43
+            return 35
+        gen = re.search(r"-(\d{1,2})th gen", label)
+        if gen:
+            generation = int(gen.group(1))
+            return 48 if generation >= 10 else 30
+    if label.startswith("Intel N"):
+        return 30 if label in {"Intel N100", "Intel N150"} else 12
+    if "Celeron" in label or "Pentium" in label:
+        return 10
+    return None

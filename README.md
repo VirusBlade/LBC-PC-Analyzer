@@ -124,7 +124,16 @@ Boucle d'amelioration :
 4. Ajouter les candidats valides dans `parser.py` et `scoring.py`.
 5. Lancer les tests.
 
-La V1 ne modifie pas automatiquement le scoring, afin d'eviter les mauvaises interpretations.
+Le backend lance aussi un auto-apprentissage prudent toutes les 5 minutes. Il ne modifie pas les fichiers Python : il ajoute des regles runtime dans SQLite quand un candidat revient assez souvent.
+
+Endpoints auto-apprentissage :
+
+```bash
+curl -X POST http://localhost:8000/learning/auto-run
+curl http://localhost:8000/learning/rules
+```
+
+Les regles apprises sont appliquees automatiquement a `/analyze` tant que le backend utilise la meme base SQLite locale.
 
 ## Tests
 
