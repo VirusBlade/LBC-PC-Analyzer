@@ -1,12 +1,13 @@
 {
   "manifest_version": 3,
   "name": "LBC PC Analyzer",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "Analyse localement les annonces Leboncoin de PC.",
   "permissions": [
     "storage"
   ],
   "host_permissions": [
+    "https://pc-analyzer-api.plaw.fr/*",
     "http://localhost:8000/*",
     "http://127.0.0.1:8000/*",
     "https://*.workers.dev/*",

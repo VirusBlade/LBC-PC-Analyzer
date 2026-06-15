@@ -1,4 +1,4 @@
-const DEFAULT_API_BASE = "http://localhost:8000";
+const DEFAULT_API_BASE = "https://pc-analyzer-api.plaw.fr";
 const API_BASE_KEY = "lbcmp_api_base";
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -11,7 +11,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     .catch((error) => {
       sendResponse({
         ok: false,
-        error: error instanceof Error ? error.message : "Backend local indisponible",
+        error: error instanceof Error ? error.message : "API indisponible",
       });
     });
 

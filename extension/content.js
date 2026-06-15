@@ -120,7 +120,7 @@
       actions.hidden = false;
     } catch (error) {
       currentItem = null;
-      status.textContent = "Backend local non joignable.";
+      status.textContent = "API non joignable.";
       resultBox.innerHTML = `<p>${escapeHtml(apiErrorMessage(error))}</p>`;
       resultBox.hidden = false;
       actions.hidden = true;
@@ -143,7 +143,7 @@
     });
 
     if (!response?.ok) {
-      throw new Error(response?.error || "Backend local indisponible");
+      throw new Error(response?.error || "API indisponible");
     }
 
     return response.data;
@@ -225,7 +225,7 @@
       badge.classList.remove("is-loading");
       badge.classList.add("is-error");
       badge.textContent = "OFF";
-      badge.title = "Backend local non joignable. Lance FastAPI sur localhost:8000.";
+      badge.title = "API non joignable. Verifie la connexion ou l'URL API.";
       badge.dataset.tooltip = badge.title;
     }
   }
@@ -422,7 +422,7 @@
 
   function apiErrorMessage(error) {
     const details = error?.message ? ` (${error.message})` : "";
-    return `Lance le backend FastAPI sur http://localhost:8000 puis recharge la page${details}.`;
+    return `API non joignable. Verifie la connexion ou l'URL configuree, puis recharge la page${details}.`;
   }
 
   function renderResult(data) {
