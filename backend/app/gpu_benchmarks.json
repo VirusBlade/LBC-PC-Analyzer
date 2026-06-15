@@ -4,31 +4,113 @@
     "score_formula": "score field is authoritative when present"
   },
   "gpus": {
-    "RTX 5090": {"score": 100, "tier": "extreme"},
-    "RTX 5080": {"score": 98, "tier": "extreme"},
-    "RTX 5070": {"score": 92, "tier": "high"},
-    "RTX 4070": {"score": 82, "tier": "high"},
-    "RTX 4060": {"score": 68, "tier": "mid"},
-    "RTX 3090": {"score": 86, "tier": "high"},
-    "RTX 3080": {"score": 80, "tier": "high"},
-    "RTX 3070": {"score": 70, "tier": "mid"},
-    "RTX 3060": {"score": 58, "tier": "mid"},
-    "RTX 2080": {"score": 58, "tier": "mid"},
-    "RTX 2070": {"score": 50, "tier": "mid"},
-    "RTX 2060": {"score": 44, "tier": "entry"},
-    "GTX 1660 SUPER": {"score": 38, "tier": "entry"},
-    "GTX 1660": {"score": 34, "tier": "entry"},
-    "GTX 1650": {"score": 24, "tier": "old"},
-    "GTX 1050 TI": {"score": 16, "tier": "old"},
-    "RX 7900 XTX": {"score": 90, "tier": "high"},
-    "RX 7800 XT": {"score": 78, "tier": "high"},
-    "RX 7700 XT": {"score": 70, "tier": "mid"},
-    "RX 7600": {"score": 55, "tier": "mid"},
-    "RX 6800 XT": {"score": 76, "tier": "high"},
-    "RX 6700 XT": {"score": 62, "tier": "mid"},
-    "RX 6600": {"score": 42, "tier": "entry"},
-    "Radeon 780M": {"score": 26, "tier": "integrated"},
-    "Intel Arc A770": {"score": 58, "tier": "mid"},
-    "Intel Arc A750": {"score": 52, "tier": "mid"}
+    "RTX 5090": {
+      "score": 100,
+      "tier": "extreme"
+    },
+    "RTX 5080": {
+      "score": 98,
+      "tier": "extreme"
+    },
+    "RTX 5070": {
+      "score": 92,
+      "tier": "high"
+    },
+    "RTX 4070": {
+      "score": 82,
+      "tier": "high"
+    },
+    "RTX 4060": {
+      "score": 68,
+      "tier": "mid"
+    },
+    "RTX 3090": {
+      "score": 86,
+      "tier": "high"
+    },
+    "RTX 3080": {
+      "score": 80,
+      "tier": "high"
+    },
+    "RTX 3070": {
+      "score": 70,
+      "tier": "mid"
+    },
+    "RTX 3060": {
+      "score": 58,
+      "tier": "mid"
+    },
+    "RTX 2080": {
+      "score": 58,
+      "tier": "mid"
+    },
+    "RTX 2070": {
+      "score": 50,
+      "tier": "mid"
+    },
+    "RTX 2060": {
+      "score": 44,
+      "tier": "entry"
+    },
+    "GTX 1660 SUPER": {
+      "score": 38,
+      "tier": "entry"
+    },
+    "GTX 1660": {
+      "score": 34,
+      "tier": "entry"
+    },
+    "GTX 1650": {
+      "score": 24,
+      "tier": "old"
+    },
+    "GTX 1050 TI": {
+      "score": 16,
+      "tier": "old"
+    },
+    "RX 7900 XTX": {
+      "score": 90,
+      "tier": "high"
+    },
+    "RX 7800 XT": {
+      "score": 78,
+      "tier": "high"
+    },
+    "RX 7700 XT": {
+      "score": 70,
+      "tier": "mid"
+    },
+    "RX 7600": {
+      "score": 55,
+      "tier": "mid"
+    },
+    "RX 6800 XT": {
+      "score": 76,
+      "tier": "high"
+    },
+    "RX 6750 XT": {
+      "score": 66,
+      "tier": "mid"
+    },
+    "RX 6700 XT": {
+      "score": 62,
+      "tier": "mid"
+    },
+    "RX 6600": {
+      "score": 42,
+      "tier": "entry"
+    },
+    "Radeon 780M": {
+      "score": 26,
+      "tier": "integrated"
+    },
+    "Intel Arc A770": {
+      "score": 58,
+      "tier": "mid"
+    },
+    "Intel Arc A750": {
+      "score": 52,
+      "tier": "mid"
+    }
   }
 }

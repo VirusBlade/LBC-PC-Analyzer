@@ -1,6 +1,9 @@
 name = "lbc-pc-analyzer-api"
 main = "src/index.ts"
 compatibility_date = "2026-06-15"
+workers_dev = false
+preview_urls = false
+routes = [{ pattern = "pc-analyzer-api.plaw.fr", custom_domain = true }]
 
 [observability]
 enabled = true

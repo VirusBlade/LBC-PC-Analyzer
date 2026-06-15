@@ -256,7 +256,20 @@
   }
 
   function formatScoreDetails(details) {
-    return `CPU ${details.cpu_score}/100 · RAM ${details.ram_score}/100 · Disque ${details.storage_score}/100 · Prix ${details.price_score}/100`;
+    const parts = [`CPU ${details.cpu_score}/100`];
+    if (details.gpu_score !== undefined && details.gpu_score !== null && details.gpu_score > 0) {
+      parts.push(`GPU ${details.gpu_score}/100`);
+    }
+    parts.push(`RAM ${details.ram_score}/100`, `Disque ${details.storage_score}/100`, `Prix ${details.price_score}/100`);
+    return parts.join(" · ");
+  }
+
+  function formatComponentScore(label, score, source) {
+    if (score === undefined || score === null) {
+      return label;
+    }
+    const sourceLabel = source === "learned" ? "appris" : source === "benchmark" ? "benchmark" : source === "manual" ? "manuel" : source === "fallback" ? "estime" : null;
+    return `${label} · ${score}/100${sourceLabel ? ` (${sourceLabel})` : ""}`;
   }
 
   function looksLikeComputerListing(text) {
@@ -429,8 +442,8 @@
     const rows = [
       ["Marque", data.brand || "Inconnue"],
       ["Modele", data.model || "Inconnu"],
-      ["CPU", data.cpu || "Inconnu"],
-      ["GPU", data.gpu || "Aucun / inconnu"],
+      ["CPU", formatComponentScore(data.cpu || "Inconnu", data.details?.cpu_score, data.details?.cpu_score_source)],
+      ["GPU", data.gpu ? formatComponentScore(data.gpu, data.details?.gpu_score, data.details?.gpu_score_source) : "Aucun / inconnu"],
       ["RAM", data.ram_gb ? `${data.ram_gb} Go${data.ram_type ? ` ${data.ram_type}` : ""}${data.ram_speed_mhz ? ` ${data.ram_speed_mhz}MHz` : ""}` : "Inconnue"],
       ["Disque", data.storage_label || "Inconnu"],
       ["Score", `${data.score}/100`],

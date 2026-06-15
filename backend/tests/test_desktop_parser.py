@@ -28,3 +28,15 @@ def test_parse_desktop_pc_with_sata_ssd_and_amd_gpu():
     assert parsed["ram_type"] == "DDR4"
     assert parsed["ram_speed_mhz"] == 3200
     assert parsed["storage_type"] == "SATA SSD"
+
+
+def test_parse_desktop_pc_with_radeon_rx_6750_xt():
+    parsed = parse_listing(
+        "PC custom Ryzen 5 5600 Carte Graphique AMD Radeon Rx6750xt 32 Go DDR4 SSD 1To",
+        "700 €",
+        "Tour gamer avec Carte Graphique AMD Radeon RX 6750 XT.",
+    )
+
+    assert parsed["gpu"] == "RX 6750 XT"
+    assert parsed["ram_gb"] == 32
+    assert parsed["storage_gb"] == 1024
