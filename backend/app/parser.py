@@ -4,6 +4,8 @@ import re
 from typing import Any
 
 
+CUSTOM_PC_BRAND = "PC Custom"
+
 BRANDS = [
     "Beelink",
     "Minisforum",
@@ -71,7 +73,24 @@ def parse_price(value: Any, text: str = "") -> int | None:
     return int(cleaned) if cleaned else None
 
 
+def looks_like_custom_pc(text: str) -> bool:
+    custom_patterns = [
+        r"\bPC\s*(?:custom|gamer|gaming|fixe|monte|mont[ée]|assemble|assembl[ée])\b",
+        r"\b(?:tour|config|configuration)\s*(?:gamer|gaming|custom|montee|mont[ée]e|assemblee|assembl[ée]e)?\b",
+        r"\bcarte\s+(?:mere|m[èe]re|graphique)\b",
+        r"\b(?:boitier|alimentation|watercooling|ventirad)\b",
+    ]
+    return any(re.search(pattern, text, re.I) for pattern in custom_patterns) and not re.search(
+        r"\b(Beelink|Minisforum|GMKtec|Geekom|Chuwi|Lenovo|HP|Dell|Shuttle|NiPoGi|Acemagic|Ace\s+Magician)\b",
+        text,
+        re.I,
+    )
+
+
 def extract_brand(text: str) -> str | None:
+    if looks_like_custom_pc(text):
+        return CUSTOM_PC_BRAND
+
     for brand in BRANDS:
         if re.search(rf"\b{re.escape(brand)}\b", text, re.I):
             return "Acemagic" if brand == "Ace Magician" else brand
@@ -261,7 +280,7 @@ def extract_model(title: str, brand: str | None, cpu: str | None) -> str | None:
     if cpu:
         cpu_token = re.escape(cpu.replace("Intel ", "").replace("-", " "))
         model = re.sub(cpu_token, "", model, flags=re.I)
-    model = re.sub(r"\b(mini\s*pc|pc|ordinateur|ryzen|intel)\b", "", model, flags=re.I)
+    model = re.sub(r"\b(mini\s*pc|pc|ordinateur|ryzen|intel|custom)\b", "", model, flags=re.I)
     model = re.sub(r"\b\d+\s*(go|gb|to|tb)\b", "", model, flags=re.I)
     model = re.sub(r"\s+", " ", model).strip(" -,:")
     return model[:80] or None

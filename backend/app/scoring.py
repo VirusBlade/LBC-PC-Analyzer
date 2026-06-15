@@ -42,6 +42,7 @@ CPU_TABLE = {
 }
 
 BRAND_ADJUSTMENTS = {
+    "PC Custom": (0, "configuration assemblee"),
     "Lenovo": (5, "marque pro fiable"),
     "HP": (5, "marque pro fiable"),
     "Dell": (5, "marque pro fiable"),

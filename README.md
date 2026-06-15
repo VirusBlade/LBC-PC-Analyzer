@@ -273,3 +273,19 @@ D1 contient :
 - `learned_brand`
 
 Avant le premier deploy public, le compte Cloudflare doit avoir un sous-domaine `workers.dev` actif, ou un route/custom domain configure dans `wrangler.toml`.
+
+
+## CI/CD API Cloudflare
+
+Le workflow GitHub Actions `.github/workflows/deploy-api.yml` teste et deploie automatiquement le Worker quand `worker/**` change sur `main`.
+
+Secrets GitHub requis dans `Settings > Secrets and variables > Actions` :
+
+- `CLOUDFLARE_API_TOKEN` : token Cloudflare avec droit de deploy Worker et acces D1 ;
+- `CLOUDFLARE_ACCOUNT_ID` : identifiant du compte Cloudflare.
+
+Le deploiement cible le domaine custom configure dans `worker/wrangler.toml` :
+
+```text
+pc-analyzer-api.plaw.fr
+```

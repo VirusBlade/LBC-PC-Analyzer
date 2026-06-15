@@ -40,3 +40,14 @@ def test_parse_desktop_pc_with_radeon_rx_6750_xt():
     assert parsed["gpu"] == "RX 6750 XT"
     assert parsed["ram_gb"] == 32
     assert parsed["storage_gb"] == 1024
+
+
+def test_custom_pc_does_not_use_motherboard_brand():
+    parsed = parse_listing(
+        "PC custom Ryzen 5 5600 RX 6750 XT 32 Go",
+        "700 €",
+        "Carte mere MSI B550, alimentation Corsair, boitier NZXT.",
+    )
+
+    assert parsed["brand"] == "PC Custom"
+    assert parsed["gpu"] == "RX 6750 XT"
