@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from .benchmarks import cpu_score_from_benchmark
+
 
 CPU_TABLE = {
     "Ryzen 7 H255": 98,
@@ -110,8 +112,18 @@ def _verdict(score: int) -> str:
 
 def score_listing(parsed: dict[str, Any], learned_cpu_scores: dict[str, int] | None = None) -> dict[str, Any]:
     cpu = parsed.get("cpu")
-    cpu_scores = {**CPU_TABLE, **(learned_cpu_scores or {})}
-    cpu_score = cpu_scores.get(cpu, 35)
+    benchmark_score, benchmark = cpu_score_from_benchmark(cpu)
+    learned_cpu_scores = learned_cpu_scores or {}
+    cpu_scores = {**CPU_TABLE, **learned_cpu_scores}
+    if cpu in learned_cpu_scores:
+        cpu_score = learned_cpu_scores[cpu]
+        cpu_score_source = "learned"
+    elif benchmark_score is not None:
+        cpu_score = benchmark_score
+        cpu_score_source = "benchmark"
+    else:
+        cpu_score = cpu_scores.get(cpu, 35)
+        cpu_score_source = "manual" if cpu in CPU_TABLE else "fallback"
     ram_score = _ram_score(parsed.get("ram_gb"))
     storage_score = _storage_score(parsed.get("storage_gb"), parsed.get("storage_type"))
     price_score = _price_score(parsed.get("price"), cpu_score, parsed.get("ram_gb"), parsed.get("storage_gb"))
@@ -142,6 +154,10 @@ def score_listing(parsed: dict[str, Any], learned_cpu_scores: dict[str, int] | N
         "reason": reason,
         "details": {
             "cpu_score": cpu_score,
+            "cpu_score_source": cpu_score_source,
+            "cpu_mark": benchmark.get("cpu_mark") if benchmark else None,
+            "cpu_single_thread": benchmark.get("single_thread") if benchmark else None,
+            "cpu_tier": benchmark.get("tier") if benchmark else None,
             "ram_score": ram_score,
             "storage_score": storage_score,
             "price_score": price_score,

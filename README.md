@@ -86,7 +86,24 @@ Des ajustements sont appliques :
 - bonus pour RAM >= 32 Go ;
 - bonus pour SSD >= 512 Go.
 
-Les tables sont dans `backend/app/scoring.py` et les regex dans `backend/app/parser.py`.
+Les regex sont dans `backend/app/parser.py`. Le scoring utilise en priorite `backend/app/cpu_benchmarks.json`, puis les regles apprises SQLite, puis la table de fallback dans `backend/app/scoring.py`.
+
+### Base CPU benchmark
+
+`backend/app/cpu_benchmarks.json` contient une base locale inspiree d'un scoring type PassMark CPU Mark :
+
+```json
+{
+  "Ryzen 7 5800U": {
+    "cpu_mark": 18800,
+    "single_thread": 3050,
+    "score": 79,
+    "tier": "good"
+  }
+}
+```
+
+Le champ `score` est prioritaire. S'il est absent, le backend estime `cpu_mark / 240`, plafonne a 100.
 
 ## Apprentissage Local
 
