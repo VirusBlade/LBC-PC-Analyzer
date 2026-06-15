@@ -275,6 +275,25 @@ D1 contient :
 Avant le premier deploy public, le compte Cloudflare doit avoir un sous-domaine `workers.dev` actif, ou un route/custom domain configure dans `wrangler.toml`.
 
 
+
+
+## Auto-apprentissage Cloudflare
+
+Le Worker execute un cron toutes les 5 minutes (`*/5 * * * *`). Il lit les observations D1 recentes, detecte les CPU/GPU/marques frequents qui manquent ou tombent en score inconnu, puis alimente :
+
+- `learned_cpu` ;
+- `learned_gpu` ;
+- `learned_brand`.
+
+Declenchement manuel possible :
+
+```bash
+curl https://pc-analyzer-api.plaw.fr/learning/auto-run
+curl https://pc-analyzer-api.plaw.fr/learning/rules
+```
+
+L'API applique ensuite ces regles apprises avant de scorer une annonce.
+
 ## CI/CD API Cloudflare
 
 Le workflow GitHub Actions `.github/workflows/deploy-api.yml` teste et deploie automatiquement le Worker quand `worker/**` change sur `main`.

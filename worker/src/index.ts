@@ -34,7 +34,26 @@ const GPU_SCORES: Record<string, { score: number; tier: string }> = {
 const BRAND_ADJUSTMENTS: Record<string, [number, string]> = { "PC Custom": [0, "configuration assemblee"], Lenovo: [5, "marque pro fiable"], HP: [5, "marque pro fiable"], Dell: [5, "marque pro fiable"], Shuttle: [5, "marque pro fiable"], Minisforum: [4, "bonne marque PC compact"], Beelink: [4, "bonne marque PC compact"], Geekom: [3, "bonne marque PC compact"], GMKtec: [2, "marque PC compact correcte"], MSI: [3, "bonne marque PC"], Asus: [3, "bonne marque PC"], Acer: [1, "marque correcte"], Intel: [3, "NUC / plateforme reconnue"], Chuwi: [-2, "marque entree de gamme"], NiPoGi: [-3, "marque a verifier"], Acemagic: [-2, "marque a verifier"] };
 const PENALIZED_CPUS = new Set(["Intel N100", "Intel N150", "Intel N4000", "Intel G630", "AMD A10", "Intel i5-8500T", "Intel i5-6500T", "Intel i3-7th gen"]);
 
-export default { async fetch(request: Request, env: Env): Promise<Response> { if (request.method === "OPTIONS") return cors(new Response(null, { status: 204 })); const url = new URL(request.url); try { if (url.pathname === "/health") return json({ status: "ok" }); if (url.pathname === "/analyze" && request.method === "POST") return analyze(request, env); if (url.pathname === "/learning/stats") return json(await learningStats(env)); if (url.pathname === "/learning/examples") return json(await learningExamples(env, url.searchParams.get("flag"), Number(url.searchParams.get("limit") || 30))); if (url.pathname === "/learning/rules") return json(await learningRules(env)); return json({ error: "Not found" }, 404); } catch (error) { return json({ error: error instanceof Error ? error.message : "Internal error" }, 500); } } };
+export default {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    if (request.method === "OPTIONS") return cors(new Response(null, { status: 204 }));
+    const url = new URL(request.url);
+    try {
+      if (url.pathname === "/health") return json({ status: "ok" });
+      if (url.pathname === "/analyze" && request.method === "POST") return analyze(request, env);
+      if (url.pathname === "/learning/stats") return json(await learningStats(env));
+      if (url.pathname === "/learning/examples") return json(await learningExamples(env, url.searchParams.get("flag"), Number(url.searchParams.get("limit") || 30)));
+      if (url.pathname === "/learning/rules") return json(await learningRules(env));
+      if (url.pathname === "/learning/auto-run" && ["GET", "POST"].includes(request.method)) return json(await autoLearn(env));
+      return json({ error: "Not found" }, 404);
+    } catch (error) {
+      return json({ error: error instanceof Error ? error.message : "Internal error" }, 500);
+    }
+  },
+  async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    ctx.waitUntil(autoLearn(env));
+  },
+};
 async function analyze(request: Request, env: Env): Promise<Response> { const payload = await request.json<AnalyzeRequest>(); let parsed = parseListing(payload.title || "", payload.price ?? null, payload.description || ""); parsed = await applyLearnedRules(env, parsed, `${payload.title || ""} ${payload.description || ""}`); const result = scoreListing(parsed, await learnedScores(env)); const full = { ...parsed, ...result }; await recordObservation(env, payload, full, payload.url || null); return json(full); }
 function parseListing(title: string, price: string | number | null, description: string): ParsedListing { const text = normalize(`${title} ${typeof price === "string" ? price : ""} ${description}`); const brand = extractBrand(text); const cpu = extractCpu(text); const gpu = extractGpu(text); const ram_gb = extractRamGb(text); const ram = extractRamDetails(text); const storage = extractStorage(text); return { brand, model: null, cpu, gpu, ram_gb, ...ram, ...storage, price: parsePrice(price, text), raw: { title, description } }; }
 function normalize(value: string): string { return value.replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim(); }
@@ -84,6 +103,207 @@ async function applyLearnedRules(env: Env, parsed: ParsedListing, text: string):
 
   return next;
 }
+
+type LearnBucketItem = { value: string; count: number };
+type ObservationRow = { title?: string; description?: string; parsed_json?: string; flags?: string };
+type ParsedObservation = { cpu?: string | null; gpu?: string | null; brand?: string | null; raw?: { title?: string; description?: string }; details?: { cpu_score?: number; gpu_score?: number } };
+
+const MIN_CPU_OCCURRENCES = 2;
+const MIN_GPU_OCCURRENCES = 2;
+const MIN_BRAND_OCCURRENCES = 3;
+
+async function autoLearn(env: Env) {
+  const rows = ((await env.DB.prepare("SELECT title, description, parsed_json, flags FROM observations ORDER BY id DESC LIMIT 300").all()).results || []) as ObservationRow[];
+  const cpuBucket = new Map<string, number>();
+  const gpuBucket = new Map<string, number>();
+  const brandBucket = new Map<string, number>();
+
+  for (const row of rows) {
+    const parsed = safeJson<ParsedObservation>(row.parsed_json || "{}") || {};
+    const flags = safeJson<string[]>(row.flags || "[]") || [];
+    const text = normalize(`${row.title || ""} ${row.description || ""} ${parsed.raw?.title || ""} ${parsed.raw?.description || ""} ${parsed.cpu || ""} ${parsed.gpu || ""} ${parsed.brand || ""}`);
+
+    if (flags.includes("missing_cpu") || flags.includes("unknown_cpu_score") || parsed.details?.cpu_score === 35) {
+      for (const candidate of candidateCpus(text)) bump(cpuBucket, candidate);
+      if (parsed.cpu && parsed.details?.cpu_score === 35) bump(cpuBucket, parsed.cpu);
+    }
+    if (flags.includes("unknown_gpu_score") || !parsed.gpu) {
+      for (const candidate of candidateGpus(text)) bump(gpuBucket, candidate);
+    }
+    if (flags.includes("missing_brand") || !parsed.brand) {
+      for (const candidate of candidateBrands(text)) bump(brandBucket, candidate);
+    }
+  }
+
+  const learned = { cpu: [] as Array<Record<string, unknown>>, gpu: [] as Array<Record<string, unknown>>, brand: [] as Array<Record<string, unknown>> };
+  const statements: D1PreparedStatement[] = [];
+
+  for (const item of topCandidates(cpuBucket, 50)) {
+    if (item.count < MIN_CPU_OCCURRENCES) continue;
+    const label = normalizeCpuLabel(item.value);
+    const score = label ? estimateCpuScore(label) : null;
+    if (!label || score === null || CPU_SCORES[label]) continue;
+    statements.push(env.DB.prepare("INSERT INTO learned_cpu (pattern, label, score, seen_count) VALUES (?, ?, ?, ?) ON CONFLICT(pattern) DO UPDATE SET label = excluded.label, score = excluded.score, seen_count = excluded.seen_count, updated_at = CURRENT_TIMESTAMP").bind(item.value.toUpperCase(), label, score, item.count));
+    learned.cpu.push({ pattern: item.value.toUpperCase(), label, score, count: item.count });
+  }
+
+  for (const item of topCandidates(gpuBucket, 50)) {
+    if (item.count < MIN_GPU_OCCURRENCES) continue;
+    const label = normalizeGpuLabel(item.value);
+    const score = label ? estimateGpuScore(label) : null;
+    if (!label || score === null || GPU_SCORES[label]) continue;
+    statements.push(env.DB.prepare("INSERT INTO learned_gpu (pattern, label, score, seen_count) VALUES (?, ?, ?, ?) ON CONFLICT(pattern) DO UPDATE SET label = excluded.label, score = excluded.score, seen_count = excluded.seen_count, updated_at = CURRENT_TIMESTAMP").bind(item.value.toUpperCase(), label, score, item.count));
+    learned.gpu.push({ pattern: item.value.toUpperCase(), label, score, count: item.count });
+  }
+
+  for (const item of topCandidates(brandBucket, 30)) {
+    if (item.count < MIN_BRAND_OCCURRENCES) continue;
+    const label = normalizeBrandLabel(item.value);
+    if (!label || BRANDS.some((brand) => brand.toUpperCase() === label.toUpperCase()) || label === CUSTOM_PC_BRAND) continue;
+    statements.push(env.DB.prepare("INSERT INTO learned_brand (pattern, label, seen_count) VALUES (?, ?, ?) ON CONFLICT(pattern) DO UPDATE SET label = excluded.label, seen_count = excluded.seen_count, updated_at = CURRENT_TIMESTAMP").bind(label.toUpperCase(), label, item.count));
+    learned.brand.push({ pattern: label.toUpperCase(), label, count: item.count });
+  }
+
+  if (statements.length) await env.DB.batch(statements);
+  return { scanned: rows.length, written: statements.length, learned };
+}
+
+function candidateCpus(text: string): string[] {
+  const upper = text.toUpperCase().replace(/[._/-]+/g, " ").replace(/\s+/g, " ");
+  const patterns = [/RYZEN\s+[3579]\s+(?:\d{4}|H\s*\d{3})[A-Z]{0,2}/g, /I[3579]\s*\d{4,5}[A-Z]{0,2}/g, /INTEL\s+I[3579]\s*\d{4,5}[A-Z]{0,2}/g, /I[3579]\s*\d{1,2}(?:TH)?\s*GEN/g, /N\d{3,4}/g, /(?:CELERON|PENTIUM)\s+[A-Z]?\d{3,5}/g];
+  return collectMatches(upper, patterns);
+}
+
+function candidateGpus(text: string): string[] {
+  const upper = text.toUpperCase().replace(/[._/-]+/g, " ").replace(/\s+/g, " ");
+  const patterns = [/RTX\s*(?:PRO\s*)?\d{4}(?:\s*SUPER|\s*TI)?/g, /GTX\s*\d{4}(?:\s*SUPER|\s*TI)?/g, /RX\s*\d{4}(?:\s*XT|\s*XTX)?/g, /RADEON\s*\d{3,4}M/g, /ARC\s*A\d{3,4}/g];
+  return collectMatches(upper, patterns);
+}
+
+function candidateBrands(text: string): string[] {
+  const found = text.match(/[A-Z][A-Za-z0-9]{2,}(?:\s+[A-Z][A-Za-z0-9]{1,}){0,2}/g) || [];
+  const stop = new Set(["Prix", "France", "Windows", "Livraison", "Annonce", "Ordinateurs", "Categorie", "Catégorie", "Deja Vu", "Déjà Vu", "Tres bon", "Très bon"]);
+  return found.map((item) => item.trim()).filter((item) => !stop.has(item) && !/\d/.test(item)).slice(0, 20);
+}
+
+function collectMatches(text: string, patterns: RegExp[]): string[] {
+  const found = new Set<string>();
+  for (const pattern of patterns) for (const match of text.matchAll(pattern)) found.add(match[0].replace(/\s+/g, " ").trim());
+  return [...found];
+}
+
+function normalizeCpuLabel(value: string): string | null {
+  const upper = value.toUpperCase().replace(/[.-]+/g, " ").replace(/\s+/g, " ").trim();
+  const ryzen = upper.match(/RYZEN\s+([3579])\s+((?:\d{4}|H\s*\d{3})[A-Z]{0,2})/);
+  if (ryzen) return `Ryzen ${ryzen[1]} ${ryzen[2].replace(/\s/g, "")}`;
+  const intelCore = upper.match(/(?:INTEL\s*)?I([3579])\s*(\d{4,5}[A-Z]{0,2})/);
+  if (intelCore) return `Intel i${intelCore[1]}-${intelCore[2]}`;
+  const intelGen = upper.match(/I([3579])\s*(\d{1,2})(?:TH)?\s*GEN/);
+  if (intelGen) return `Intel i${intelGen[1]}-${intelGen[2]}th gen`;
+  const intelN = upper.match(/N(\d{3,4})/);
+  if (intelN) return `Intel N${intelN[1]}`;
+  const celeron = upper.match(/CELERON\s+([A-Z]?\d{3,5})/);
+  if (celeron) return `Intel Celeron ${celeron[1]}`;
+  const pentium = upper.match(/PENTIUM\s+([A-Z]?\d{3,5})/);
+  if (pentium) return `Intel Pentium ${pentium[1]}`;
+  return null;
+}
+
+function estimateCpuScore(label: string): number | null {
+  if (label.startsWith("Ryzen")) {
+    const model = label.match(/(\d{4})/);
+    if (!model) return null;
+    const number = Number(model[1]);
+    if (number >= 8700) return 95;
+    if (number >= 7700) return 90;
+    if (number >= 6800) return 86;
+    if (number >= 5700) return 78;
+    if (number >= 5500) return 66;
+    if (number >= 3700) return 60;
+    return 55;
+  }
+  if (label.startsWith("Intel i")) {
+    const model = label.match(/-(\d{4,5})/);
+    if (model) {
+      const raw = model[1];
+      const generation = raw.length >= 5 ? Number(raw.slice(0, 2)) : Number(raw[0]);
+      if (generation >= 13) return 82;
+      if (generation >= 12) return 74;
+      if (generation >= 11) return 62;
+      if (generation >= 10) return 48;
+      if (generation >= 8) return 43;
+      return 35;
+    }
+    const gen = label.match(/-(\d{1,2})th gen/);
+    if (gen) return Number(gen[1]) >= 10 ? 48 : 30;
+  }
+  if (label.startsWith("Intel N")) return ["Intel N100", "Intel N150"].includes(label) ? 30 : 12;
+  if (label.includes("Celeron") || label.includes("Pentium")) return 10;
+  return null;
+}
+
+function normalizeGpuLabel(value: string): string | null {
+  const upper = value.toUpperCase().replace(/[-_]+/g, " ").replace(/\s+/g, " ").trim();
+  const rtx = upper.match(/RTX\s*(?:PRO\s*)?(\d{4})(?:\s*(SUPER|TI))?/);
+  if (rtx) return `RTX ${rtx[1]}${rtx[2] ? ` ${rtx[2]}` : ""}`;
+  const gtx = upper.match(/GTX\s*(\d{4})(?:\s*(SUPER|TI))?/);
+  if (gtx) return `GTX ${gtx[1]}${gtx[2] ? ` ${gtx[2]}` : ""}`;
+  const rx = upper.match(/RX\s*(\d{4})(?:\s*(XT|XTX))?/);
+  if (rx) return `RX ${rx[1]}${rx[2] ? ` ${rx[2]}` : ""}`;
+  const arc = upper.match(/ARC\s*(A\d{3,4})/);
+  if (arc) return `Intel Arc ${arc[1]}`;
+  const radeon = upper.match(/RADEON\s*(\d{3,4}M)/);
+  if (radeon) return `Radeon ${radeon[1]}`;
+  return null;
+}
+
+function estimateGpuScore(label: string): number | null {
+  const model = label.match(/(\d{4})/);
+  if (!model) return null;
+  const number = Number(model[1]);
+  if (label.startsWith("RTX")) {
+    const generation = Math.floor(number / 1000) * 10;
+    const tier = number % 1000;
+    const base = ({ 50: 92, 40: 72, 30: 50, 20: 38, 10: 18 } as Record<number, number>)[generation] ?? 35;
+    if (tier >= 900) return Math.min(100, base + 18);
+    if (tier >= 800) return Math.min(100, base + 12);
+    if (tier >= 700) return Math.min(100, base + 5);
+    if (tier <= 600) return Math.max(10, base - 8);
+    return base;
+  }
+  if (label.startsWith("GTX")) return number >= 1660 ? 36 : number >= 1650 ? 24 : 16;
+  if (label.startsWith("RX")) {
+    const generation = Math.floor(number / 1000);
+    const tier = number % 1000;
+    const base = ({ 7: 58, 6: 45, 5: 25 } as Record<number, number>)[generation] ?? 35;
+    if (tier >= 900) return Math.min(100, base + 20);
+    if (tier >= 800) return Math.min(100, base + 12);
+    if (tier >= 700) return Math.min(100, base + 5);
+    return base;
+  }
+  if (label.includes("Arc")) return 55;
+  return null;
+}
+
+function normalizeBrandLabel(value: string): string | null {
+  const label = value.replace(/\s+/g, " ").trim();
+  if (label.length < 3 || label.length > 40 || /\d/.test(label)) return null;
+  return label;
+}
+
+function bump(bucket: Map<string, number>, key: string): void {
+  if (!key) return;
+  bucket.set(key, (bucket.get(key) || 0) + 1);
+}
+
+function topCandidates(bucket: Map<string, number>, limit: number): LearnBucketItem[] {
+  return [...bucket.entries()].map(([value, count]) => ({ value, count })).sort((a, b) => b.count - a.count).slice(0, limit);
+}
+
+function safeJson<T>(value: string): T | null {
+  try { return JSON.parse(value) as T; } catch (_error) { return null; }
+}
+
 async function learnedScores(env: Env): Promise<{ cpu: Record<string, number>; gpu: Record<string, number> }> { const cpuRows = (await env.DB.prepare("SELECT label, score FROM learned_cpu").all()).results || []; const gpuRows = (await env.DB.prepare("SELECT label, score FROM learned_gpu").all()).results || []; return { cpu: Object.fromEntries(cpuRows.map((r: any) => [r.label, r.score])), gpu: Object.fromEntries(gpuRows.map((r: any) => [r.label, r.score])) }; }
 function scoreListing(parsed: ParsedListing, learned: { cpu: Record<string, number>; gpu: Record<string, number> }) { const cpuBench = parsed.cpu ? CPU_SCORES[parsed.cpu] : undefined; const cpuScore = parsed.cpu && learned.cpu[parsed.cpu] ? learned.cpu[parsed.cpu] : (cpuBench?.score ?? 35); const cpuSource = parsed.cpu && learned.cpu[parsed.cpu] ? "learned" : (cpuBench ? "benchmark" : (parsed.cpu ? "fallback" : null)); const gpuBench = parsed.gpu ? GPU_SCORES[parsed.gpu] : undefined; const gpuScore = parsed.gpu && learned.gpu[parsed.gpu] ? learned.gpu[parsed.gpu] : (gpuBench?.score ?? 0); const gpuSource = parsed.gpu && learned.gpu[parsed.gpu] ? "learned" : (gpuBench ? "benchmark" : (parsed.gpu ? "fallback" : null)); const ramScore = ramScoreOf(parsed.ram_gb, parsed.ram_type, parsed.ram_speed_mhz); const storageScore = storageScoreOf(parsed.storage_gb, parsed.storage_type); const priceScore = priceScoreOf(parsed.price, cpuScore + gpuScore * 0.45, parsed.ram_gb, parsed.storage_gb); const desktopGpu = Boolean(parsed.gpu && gpuScore >= 30); let score = desktopGpu ? cpuScore * 0.35 + gpuScore * 0.3 + ramScore * 0.15 + storageScore * 0.1 + priceScore * 0.1 : cpuScore * 0.5 + ramScore * 0.2 + storageScore * 0.1 + priceScore * 0.2; const adjustments: string[] = []; const brandAdjustment = parsed.brand ? BRAND_ADJUSTMENTS[parsed.brand] : undefined; if (parsed.cpu && PENALIZED_CPUS.has(parsed.cpu)) { score -= 8; adjustments.push("CPU peu performant ou ancien"); } if (brandAdjustment) { score += brandAdjustment[0]; adjustments.push(brandAdjustment[1]); } if (parsed.ram_gb && parsed.ram_gb >= 32) { score += 4; adjustments.push("32 Go de RAM ou plus"); } if (parsed.ram_type === "DDR5") { score += 2; adjustments.push("DDR5"); } if (desktopGpu) adjustments.push("GPU dedie"); if (parsed.storage_gb && parsed.storage_gb >= 512 && ["SSD", "NVMe"].includes(parsed.storage_type || "")) { score += 3; adjustments.push("SSD confortable"); } const finalScore = Math.max(0, Math.min(100, Math.round(score))); const verdict = finalScore >= 82 ? "Excellent" : finalScore >= 65 ? "Bon" : finalScore >= 45 ? "Moyen" : "À éviter"; const reason = `${parsed.cpu || "CPU non identifie"}${parsed.gpu ? `, ${parsed.gpu}` : ""}, ${parsed.ram_gb ? `${parsed.ram_gb} Go RAM` : "RAM inconnue"}, ${parsed.storage_label || "stockage inconnu"}: ${priceScore >= 80 ? "prix attractif pour cette configuration" : (adjustments.slice(0, 2).join(", ") || "configuration coherente mais prix a verifier")}.`; return { score: finalScore, verdict, reason, details: { cpu_score: cpuScore, cpu_score_source: cpuSource, cpu_mark: cpuBench?.cpu_mark ?? null, cpu_single_thread: cpuBench?.single_thread ?? null, cpu_tier: cpuBench?.tier ?? null, gpu_score: gpuScore, gpu_score_source: gpuSource, gpu_tier: gpuBench?.tier ?? null, scoring_profile: desktopGpu ? "desktop_gpu" : "compact_pc", brand_adjustment: brandAdjustment?.[0] ?? 0, ram_score: ramScore, storage_score: storageScore, price_score: priceScore, adjustments } }; }
 function ramScoreOf(gb: number | null, type: string | null, speed: number | null): number { let s = !gb ? 25 : gb >= 64 ? 100 : gb >= 32 ? 92 : gb >= 16 ? 76 : gb >= 8 ? 45 : 20; if (type === "DDR5") s += 5; if (type === "DDR3") s -= 8; if (speed && speed >= 5600) s += 3; if (speed && speed < 2666) s -= 5; return clamp(s); }

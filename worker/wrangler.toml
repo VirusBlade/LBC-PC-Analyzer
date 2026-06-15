@@ -12,3 +12,6 @@ enabled = true
 binding = "DB"
 database_name = "lbc_pc"
 database_id = "50760761-f9fd-4088-86c8-b23d33bca3f5"
+
+[triggers]
+crons = ["*/5 * * * *"]
