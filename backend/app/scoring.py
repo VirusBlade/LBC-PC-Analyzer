@@ -18,6 +18,7 @@ CPU_TABLE = {
     "Intel i5-1250P": 78,
     "Intel i5-1235U": 74,
     "Ryzen 7 5700U": 76,
+    "Ryzen 7 5700X": 86,
     "Ryzen 5 5650GE": 72,
     "Ryzen 5 7430U": 70,
     "Ryzen 5 5500U": 66,

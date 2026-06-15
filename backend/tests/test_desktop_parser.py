@@ -51,3 +51,14 @@ def test_custom_pc_does_not_use_motherboard_brand():
 
     assert parsed["brand"] == "PC Custom"
     assert parsed["gpu"] == "RX 6750 XT"
+
+
+def test_parse_ryzen_7_5700x():
+    parsed = parse_listing(
+        "PC Gamer Ryzen 7 5700X MSI B550 16 Go DDR4",
+        "450 €",
+        "Tour gamer sans carte graphique dediee.",
+    )
+
+    assert parsed["cpu"] == "Ryzen 7 5700X"
+    assert parsed["brand"] == "PC Custom"

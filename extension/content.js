@@ -268,8 +268,36 @@
     if (score === undefined || score === null) {
       return label;
     }
-    const sourceLabel = source === "learned" ? "appris" : source === "benchmark" ? "benchmark" : source === "manual" ? "manuel" : source === "fallback" ? "estime" : null;
+    const sourceLabel = sourceLabelOf(source);
     return `${label} · ${score}/100${sourceLabel ? ` (${sourceLabel})` : ""}`;
+  }
+
+  function sourceLabelOf(source) {
+    return source === "learned" ? "appris" : source === "benchmark" ? "benchmark" : source === "manual" ? "manuel" : source === "fallback" ? "estime" : null;
+  }
+
+  function componentScoreHtml(kind, label, score, source) {
+    if (!label) {
+      return escapeHtml(kind === "gpu" ? "Aucun / inconnu" : "Inconnu");
+    }
+    const href = benchmarkUrl(kind, label);
+    const sourceLabel = sourceLabelOf(source);
+    const meta = score === undefined || score === null ? "Score inconnu" : `${score}/100${sourceLabel ? ` · ${sourceLabel}` : ""}`;
+    return `
+      <div class="lbcmp-component">
+        <span class="lbcmp-component-name">${escapeHtml(label)}</span>
+        <span class="lbcmp-component-score">${escapeHtml(meta)}</span>
+        <a class="lbcmp-benchmark-link" href="${escapeAttr(href)}" target="_blank" rel="noopener noreferrer">${kind === "gpu" ? "GPU Bench" : "CPU Bench"}</a>
+      </div>
+    `;
+  }
+
+  function benchmarkUrl(kind, label) {
+    const query = encodeURIComponent(label);
+    if (kind === "gpu") {
+      return `https://www.videocardbenchmark.net/gpu.php?gpu=${query}`;
+    }
+    return `https://www.cpubenchmark.net/cpu_lookup.php?cpu=${query}`;
   }
 
   function looksLikeComputerListing(text) {
@@ -440,21 +468,21 @@
 
   function renderResult(data) {
     const rows = [
-      ["Marque", data.brand || "Inconnue"],
-      ["Modele", data.model || "Inconnu"],
-      ["CPU", formatComponentScore(data.cpu || "Inconnu", data.details?.cpu_score, data.details?.cpu_score_source)],
-      ["GPU", data.gpu ? formatComponentScore(data.gpu, data.details?.gpu_score, data.details?.gpu_score_source) : "Aucun / inconnu"],
-      ["RAM", data.ram_gb ? `${data.ram_gb} Go${data.ram_type ? ` ${data.ram_type}` : ""}${data.ram_speed_mhz ? ` ${data.ram_speed_mhz}MHz` : ""}` : "Inconnue"],
-      ["Disque", data.storage_label || "Inconnu"],
-      ["Score", `${data.score}/100`],
-      ["Verdict", data.verdict],
+      { label: "Marque", value: data.brand || "Inconnue" },
+      { label: "Modele", value: data.model || "Inconnu" },
+      { label: "CPU", html: componentScoreHtml("cpu", data.cpu, data.details?.cpu_score, data.details?.cpu_score_source) },
+      { label: "GPU", html: data.gpu ? componentScoreHtml("gpu", data.gpu, data.details?.gpu_score, data.details?.gpu_score_source) : escapeHtml("Aucun / inconnu") },
+      { label: "RAM", value: data.ram_gb ? `${data.ram_gb} Go${data.ram_type ? ` ${data.ram_type}` : ""}${data.ram_speed_mhz ? ` ${data.ram_speed_mhz}MHz` : ""}` : "Inconnue" },
+      { label: "Disque", value: data.storage_label || "Inconnu" },
+      { label: "Score", value: `${data.score}/100` },
+      { label: "Verdict", value: data.verdict },
     ];
 
     resultBox.innerHTML = `
       <div class="lbcmp-score">${escapeHtml(data.score)}/100</div>
       <dl>
         ${rows
-          .map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`)
+          .map((row) => `<div><dt>${escapeHtml(row.label)}</dt><dd>${row.html || escapeHtml(row.value)}</dd></div>`)
           .join("")}
       </dl>
       ${data.details ? `<div class="lbcmp-breakdown">${escapeHtml(formatScoreDetails(data.details))}</div>` : ""}

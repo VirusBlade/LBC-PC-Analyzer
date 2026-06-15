@@ -4,40 +4,193 @@
     "score_formula": "score field is authoritative when present; otherwise cpu_mark / 240 capped to 100"
   },
   "cpus": {
-    "Ryzen 7 H255": {"cpu_mark": 30000, "single_thread": 3800, "score": 98, "tier": "high"},
-    "Ryzen 7 8745HS": {"cpu_mark": 29000, "single_thread": 3700, "score": 98, "tier": "high"},
-    "Ryzen 7 8700G": {"cpu_mark": 32000, "single_thread": 3900, "score": 96, "tier": "high"},
-    "Ryzen 7 7735HS": {"cpu_mark": 24500, "single_thread": 3400, "score": 92, "tier": "high"},
-    "Ryzen 9 6900HX": {"cpu_mark": 24000, "single_thread": 3400, "score": 91, "tier": "high"},
-    "Ryzen 7 6800U": {"cpu_mark": 21000, "single_thread": 3300, "score": 88, "tier": "high"},
-    "Ryzen 7 5800H": {"cpu_mark": 21500, "single_thread": 3100, "score": 84, "tier": "high"},
-    "Ryzen 7 5800U": {"cpu_mark": 18800, "single_thread": 3050, "score": 79, "tier": "good"},
-    "Ryzen 7 5700U": {"cpu_mark": 15800, "single_thread": 2700, "score": 76, "tier": "good"},
-    "Ryzen 5 5650GE": {"cpu_mark": 15000, "single_thread": 2600, "score": 72, "tier": "good"},
-    "Ryzen 5 7430U": {"cpu_mark": 14500, "single_thread": 2700, "score": 70, "tier": "good"},
-    "Ryzen 5 5500U": {"cpu_mark": 13200, "single_thread": 2450, "score": 66, "tier": "good"},
-    "Ryzen 5 unknown": {"score": 55, "tier": "estimated"},
-    "Ryzen 7 unknown": {"score": 65, "tier": "estimated"},
-    "Ryzen 9 unknown": {"score": 75, "tier": "estimated"},
-
-    "Intel i5-12400": {"cpu_mark": 19500, "single_thread": 3550, "score": 82, "tier": "good"},
-    "Intel i5-1250P": {"cpu_mark": 17200, "single_thread": 3450, "score": 78, "tier": "good"},
-    "Intel i5-1235U": {"cpu_mark": 13600, "single_thread": 3300, "score": 74, "tier": "good"},
-    "Intel i5-1135G7": {"cpu_mark": 10100, "single_thread": 2700, "score": 62, "tier": "office"},
-    "Intel i7-6700HQ": {"cpu_mark": 6500, "single_thread": 2100, "score": 54, "tier": "old"},
-    "Intel i5-9500": {"cpu_mark": 9500, "single_thread": 2550, "score": 52, "tier": "old"},
-    "Intel i5-7500": {"cpu_mark": 6100, "single_thread": 2350, "score": 45, "tier": "old"},
-    "Intel i5-8500T": {"cpu_mark": 7600, "single_thread": 2300, "score": 43, "tier": "old_low_power"},
-    "Intel i3-10th gen": {"score": 40, "tier": "estimated"},
-    "Intel i5-10th gen": {"score": 48, "tier": "estimated"},
-    "Intel i7-10th gen": {"score": 56, "tier": "estimated"},
-    "Intel i5-6500T": {"cpu_mark": 4800, "single_thread": 2050, "score": 35, "tier": "old_low_power"},
-    "Intel i3-7th gen": {"score": 24, "tier": "estimated_old"},
-
-    "Intel N150": {"cpu_mark": 6100, "single_thread": 2000, "score": 34, "tier": "low_power"},
-    "Intel N100": {"cpu_mark": 5500, "single_thread": 1950, "score": 30, "tier": "low_power"},
-    "Intel N4000": {"cpu_mark": 1450, "single_thread": 900, "score": 12, "tier": "avoid"},
-    "Intel G630": {"cpu_mark": 1450, "single_thread": 1250, "score": 8, "tier": "avoid"},
-    "AMD A10": {"score": 15, "tier": "avoid"}
+    "Ryzen 7 H255": {
+      "cpu_mark": 30000,
+      "single_thread": 3800,
+      "score": 98,
+      "tier": "high"
+    },
+    "Ryzen 7 8745HS": {
+      "cpu_mark": 29000,
+      "single_thread": 3700,
+      "score": 98,
+      "tier": "high"
+    },
+    "Ryzen 7 8700G": {
+      "cpu_mark": 32000,
+      "single_thread": 3900,
+      "score": 96,
+      "tier": "high"
+    },
+    "Ryzen 7 7735HS": {
+      "cpu_mark": 24500,
+      "single_thread": 3400,
+      "score": 92,
+      "tier": "high"
+    },
+    "Ryzen 9 6900HX": {
+      "cpu_mark": 24000,
+      "single_thread": 3400,
+      "score": 91,
+      "tier": "high"
+    },
+    "Ryzen 7 6800U": {
+      "cpu_mark": 21000,
+      "single_thread": 3300,
+      "score": 88,
+      "tier": "high"
+    },
+    "Ryzen 7 5800H": {
+      "cpu_mark": 21500,
+      "single_thread": 3100,
+      "score": 84,
+      "tier": "high"
+    },
+    "Ryzen 7 5800U": {
+      "cpu_mark": 18800,
+      "single_thread": 3050,
+      "score": 79,
+      "tier": "good"
+    },
+    "Ryzen 7 5700U": {
+      "cpu_mark": 15800,
+      "single_thread": 2700,
+      "score": 76,
+      "tier": "good"
+    },
+    "Ryzen 7 5700X": {
+      "cpu_mark": 26700,
+      "single_thread": 3350,
+      "score": 86,
+      "tier": "high"
+    },
+    "Ryzen 5 5650GE": {
+      "cpu_mark": 15000,
+      "single_thread": 2600,
+      "score": 72,
+      "tier": "good"
+    },
+    "Ryzen 5 7430U": {
+      "cpu_mark": 14500,
+      "single_thread": 2700,
+      "score": 70,
+      "tier": "good"
+    },
+    "Ryzen 5 5500U": {
+      "cpu_mark": 13200,
+      "single_thread": 2450,
+      "score": 66,
+      "tier": "good"
+    },
+    "Ryzen 5 unknown": {
+      "score": 55,
+      "tier": "estimated"
+    },
+    "Ryzen 7 unknown": {
+      "score": 65,
+      "tier": "estimated"
+    },
+    "Ryzen 9 unknown": {
+      "score": 75,
+      "tier": "estimated"
+    },
+    "Intel i5-12400": {
+      "cpu_mark": 19500,
+      "single_thread": 3550,
+      "score": 82,
+      "tier": "good"
+    },
+    "Intel i5-1250P": {
+      "cpu_mark": 17200,
+      "single_thread": 3450,
+      "score": 78,
+      "tier": "good"
+    },
+    "Intel i5-1235U": {
+      "cpu_mark": 13600,
+      "single_thread": 3300,
+      "score": 74,
+      "tier": "good"
+    },
+    "Intel i5-1135G7": {
+      "cpu_mark": 10100,
+      "single_thread": 2700,
+      "score": 62,
+      "tier": "office"
+    },
+    "Intel i7-6700HQ": {
+      "cpu_mark": 6500,
+      "single_thread": 2100,
+      "score": 54,
+      "tier": "old"
+    },
+    "Intel i5-9500": {
+      "cpu_mark": 9500,
+      "single_thread": 2550,
+      "score": 52,
+      "tier": "old"
+    },
+    "Intel i5-7500": {
+      "cpu_mark": 6100,
+      "single_thread": 2350,
+      "score": 45,
+      "tier": "old"
+    },
+    "Intel i5-8500T": {
+      "cpu_mark": 7600,
+      "single_thread": 2300,
+      "score": 43,
+      "tier": "old_low_power"
+    },
+    "Intel i3-10th gen": {
+      "score": 40,
+      "tier": "estimated"
+    },
+    "Intel i5-10th gen": {
+      "score": 48,
+      "tier": "estimated"
+    },
+    "Intel i7-10th gen": {
+      "score": 56,
+      "tier": "estimated"
+    },
+    "Intel i5-6500T": {
+      "cpu_mark": 4800,
+      "single_thread": 2050,
+      "score": 35,
+      "tier": "old_low_power"
+    },
+    "Intel i3-7th gen": {
+      "score": 24,
+      "tier": "estimated_old"
+    },
+    "Intel N150": {
+      "cpu_mark": 6100,
+      "single_thread": 2000,
+      "score": 34,
+      "tier": "low_power"
+    },
+    "Intel N100": {
+      "cpu_mark": 5500,
+      "single_thread": 1950,
+      "score": 30,
+      "tier": "low_power"
+    },
+    "Intel N4000": {
+      "cpu_mark": 1450,
+      "single_thread": 900,
+      "score": 12,
+      "tier": "avoid"
+    },
+    "Intel G630": {
+      "cpu_mark": 1450,
+      "single_thread": 1250,
+      "score": 8,
+      "tier": "avoid"
+    },
+    "AMD A10": {
+      "score": 15,
+      "tier": "avoid"
+    }
   }
 }

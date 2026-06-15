@@ -26,6 +26,7 @@ BRANDS = [
 
 CPU_ALIASES = {
     "RYZEN 7 5700U": "Ryzen 7 5700U",
+    "RYZEN 7 5700X": "Ryzen 7 5700X",
     "RYZEN 7 5800H": "Ryzen 7 5800H",
     "RYZEN 7 5800U": "Ryzen 7 5800U",
     "RYZEN 7 8700G": "Ryzen 7 8700G",

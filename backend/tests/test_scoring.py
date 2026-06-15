@@ -57,3 +57,17 @@ def test_brand_adjustment_rewards_good_brand_and_penalizes_risky_brand():
     assert dell["details"]["brand_adjustment"] == 5
     assert nipogi["details"]["brand_adjustment"] == -3
     assert dell["score"] > nipogi["score"]
+
+
+def test_scoring_uses_ryzen_5700x_benchmark():
+    parsed = parse_listing(
+        "PC Gamer Ryzen 7 5700X 16 Go DDR4",
+        "450 €",
+        "Tour gamer sans GPU dedie.",
+    )
+
+    result = score_listing(parsed)
+
+    assert parsed["cpu"] == "Ryzen 7 5700X"
+    assert result["details"]["cpu_score"] == 86
+    assert result["details"]["cpu_score_source"] == "benchmark"
