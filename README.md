@@ -191,3 +191,34 @@ Quand un GPU dedie est detecte, le scoring utilise environ :
 - prix : 10 %
 
 Sans GPU dedie, le profil mini-PC reste utilise.
+
+
+## GPU et VideoCardBenchmark
+
+Le scoring GPU suit la meme idee que la base CPU : une table locale inspiree de scores type PassMark / VideoCardBenchmark.
+
+Source de reference : `https://www.videocardbenchmark.net/`, qui publie des benchmarks GPU PassMark G3D issus de PerformanceTest.
+
+Fichier local :
+
+```text
+backend/app/gpu_benchmarks.json
+```
+
+L'auto-apprentissage fonctionne aussi pour les GPU :
+
+- les annonces alimentees par l'extension sont stockees dans SQLite ;
+- `/learning/suggestions` remonte aussi `gpu_candidates` ;
+- toutes les 5 minutes, les GPU candidats frequents sont appris dans `learned_gpu` ;
+- `/analyze` applique les GPU appris au runtime, sans modifier les fichiers Python.
+
+## Marques
+
+Le scoring applique maintenant un ajustement par marque :
+
+- bonus fort : Lenovo, HP, Dell, Shuttle ;
+- bonus mini-PC : Minisforum, Beelink, Geekom ;
+- bonus leger : GMKtec, MSI, Asus, Intel ;
+- malus leger : Chuwi, NiPoGi, Acemagic.
+
+Le detail est visible dans `details.brand_adjustment` et dans les raisons du score.

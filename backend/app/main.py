@@ -10,7 +10,7 @@ from pydantic import BaseModel
 
 from .parser import parse_listing
 from .scoring import score_listing
-from .learning import AUTO_LEARN_INTERVAL_SECONDS, apply_learned_rules, auto_learn, get_examples, get_learned_cpu_scores, get_learned_rules, get_stats, get_suggestions, init_db, record_observation
+from .learning import AUTO_LEARN_INTERVAL_SECONDS, apply_learned_rules, auto_learn, get_examples, get_learned_cpu_scores, get_learned_gpu_scores, get_learned_rules, get_stats, get_suggestions, init_db, record_observation
 
 
 app = FastAPI(title="LBC Mini-PC Analyzer", version="0.2.0")
@@ -66,7 +66,7 @@ def health() -> dict[str, str]:
 def analyze(payload: AnalyzeRequest) -> dict:
     parsed = parse_listing(payload.title, payload.price, payload.description)
     parsed = apply_learned_rules(parsed, f"{payload.title} {payload.description}")
-    scoring = score_listing(parsed, learned_cpu_scores=get_learned_cpu_scores())
+    scoring = score_listing(parsed, learned_cpu_scores=get_learned_cpu_scores(), learned_gpu_scores=get_learned_gpu_scores())
     result = {**parsed, **scoring}
     record_observation(payload.dict(), result, payload.url)
     return result

@@ -37,3 +37,23 @@ def test_desktop_gpu_scoring_profile_uses_gpu():
     assert parsed["gpu"] == "RTX 3060"
     assert result["details"]["gpu_score"] == 58
     assert result["details"]["scoring_profile"] == "desktop_gpu"
+
+
+def test_learned_gpu_score_overrides_gpu_benchmark_when_present():
+    parsed = {"cpu": "Intel i5-12400", "gpu": "RTX 3060", "ram_gb": 16, "storage_gb": 512, "storage_type": "NVMe", "price": 650}
+
+    result = score_listing(parsed, learned_gpu_scores={"RTX 3060": 72})
+
+    assert result["details"]["gpu_score"] == 72
+    assert result["details"]["gpu_score_source"] == "learned"
+
+
+def test_brand_adjustment_rewards_good_brand_and_penalizes_risky_brand():
+    base = {"cpu": "Ryzen 7 5800U", "ram_gb": 16, "storage_gb": 512, "storage_type": "SSD", "price": 300}
+
+    dell = score_listing({**base, "brand": "Dell"})
+    nipogi = score_listing({**base, "brand": "NiPoGi"})
+
+    assert dell["details"]["brand_adjustment"] == 5
+    assert nipogi["details"]["brand_adjustment"] == -3
+    assert dell["score"] > nipogi["score"]

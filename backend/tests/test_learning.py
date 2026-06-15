@@ -53,3 +53,23 @@ def test_apply_learned_cpu_rule(tmp_path, monkeypatch):
 
     assert updated["cpu"] == "Ryzen 7 9999X"
     assert learning.get_learned_cpu_scores()["Ryzen 7 9999X"] == 93
+
+
+def test_apply_learned_gpu_rule(tmp_path, monkeypatch):
+    from app import learning
+
+    db_path = tmp_path / "learning.sqlite"
+    monkeypatch.setattr(learning, "DB_PATH", db_path)
+    learning.init_db()
+
+    with learning.sqlite3.connect(db_path) as conn:
+        conn.execute(
+            "INSERT INTO learned_gpu (pattern, label, score, seen_count) VALUES (?, ?, ?, ?)",
+            ("RTX 6060", "RTX 6060", 77, 3),
+        )
+
+    parsed = {"cpu": None, "gpu": None, "brand": None}
+    updated = learning.apply_learned_rules(parsed, "PC gamer RTX 6060 32 Go")
+
+    assert updated["gpu"] == "RTX 6060"
+    assert learning.get_learned_gpu_scores()["RTX 6060"] == 77

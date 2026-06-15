@@ -41,7 +41,24 @@ CPU_TABLE = {
     "AMD A10": 15,
 }
 
-TRUSTED_BRANDS = {"Beelink", "Lenovo", "HP", "Shuttle", "Minisforum"}
+BRAND_ADJUSTMENTS = {
+    "Lenovo": (5, "marque pro fiable"),
+    "HP": (5, "marque pro fiable"),
+    "Dell": (5, "marque pro fiable"),
+    "Shuttle": (5, "marque pro fiable"),
+    "Minisforum": (4, "bonne marque mini-PC"),
+    "Beelink": (4, "bonne marque mini-PC"),
+    "GMKtec": (2, "marque mini-PC correcte"),
+    "Geekom": (3, "bonne marque mini-PC"),
+    "MSI": (3, "bonne marque PC"),
+    "Asus": (3, "bonne marque PC"),
+    "Acer": (1, "marque correcte"),
+    "Intel": (3, "NUC / plateforme reconnue"),
+    "Chuwi": (-2, "marque entree de gamme"),
+    "NiPoGi": (-3, "marque a verifier"),
+    "Acemagic": (-2, "marque a verifier"),
+}
+TRUSTED_BRANDS = {brand for brand, (delta, _reason) in BRAND_ADJUSTMENTS.items() if delta >= 4}
 PENALIZED_CPUS = {"Intel N100", "Intel N150", "Intel N4000", "Intel G630", "AMD A10", "Intel i5-8500T", "Intel i5-6500T", "Intel i3-7th gen"}
 
 
@@ -125,7 +142,7 @@ def _verdict(score: int) -> str:
     return "À éviter"
 
 
-def score_listing(parsed: dict[str, Any], learned_cpu_scores: dict[str, int] | None = None) -> dict[str, Any]:
+def score_listing(parsed: dict[str, Any], learned_cpu_scores: dict[str, int] | None = None, learned_gpu_scores: dict[str, int] | None = None) -> dict[str, Any]:
     cpu = parsed.get("cpu")
     benchmark_score, benchmark = cpu_score_from_benchmark(cpu)
     learned_cpu_scores = learned_cpu_scores or {}
@@ -139,8 +156,17 @@ def score_listing(parsed: dict[str, Any], learned_cpu_scores: dict[str, int] | N
     else:
         cpu_score = cpu_scores.get(cpu, 35)
         cpu_score_source = "manual" if cpu in CPU_TABLE else "fallback"
-    gpu_score, gpu_benchmark = gpu_score_from_benchmark(parsed.get("gpu"))
-    gpu_score = gpu_score if gpu_score is not None else 0
+    learned_gpu_scores = learned_gpu_scores or {}
+    gpu = parsed.get("gpu")
+    gpu_score, gpu_benchmark = gpu_score_from_benchmark(gpu)
+    if gpu in learned_gpu_scores:
+        gpu_score = learned_gpu_scores[gpu]
+        gpu_score_source = "learned"
+    elif gpu_score is not None:
+        gpu_score_source = "benchmark"
+    else:
+        gpu_score = 0
+        gpu_score_source = "fallback" if gpu else None
     ram_score = _ram_score(parsed.get("ram_gb"), parsed.get("ram_type"), parsed.get("ram_speed_mhz"))
     storage_score = _storage_score(parsed.get("storage_gb"), parsed.get("storage_type"))
     price_score = _price_score(parsed.get("price"), cpu_score + gpu_score * 0.45, parsed.get("ram_gb"), parsed.get("storage_gb"))
@@ -157,9 +183,11 @@ def score_listing(parsed: dict[str, Any], learned_cpu_scores: dict[str, int] | N
     if cpu in PENALIZED_CPUS:
         score -= 8
         adjustments.append("CPU peu performant ou ancien")
-    if parsed.get("brand") in TRUSTED_BRANDS:
-        score += 4
-        adjustments.append("marque rassurante")
+    brand_adjustment = BRAND_ADJUSTMENTS.get(parsed.get("brand"))
+    if brand_adjustment:
+        brand_delta, brand_reason = brand_adjustment
+        score += brand_delta
+        adjustments.append(brand_reason)
     if parsed.get("ram_gb") and parsed["ram_gb"] >= 32:
         score += 4
         adjustments.append("32 Go de RAM ou plus")
@@ -187,7 +215,9 @@ def score_listing(parsed: dict[str, Any], learned_cpu_scores: dict[str, int] | N
             "cpu_single_thread": benchmark.get("single_thread") if benchmark else None,
             "cpu_tier": benchmark.get("tier") if benchmark else None,
             "gpu_score": gpu_score,
+            "gpu_score_source": gpu_score_source,
             "gpu_tier": gpu_benchmark.get("tier") if gpu_benchmark else None,
+            "brand_adjustment": brand_adjustment[0] if brand_adjustment else 0,
             "scoring_profile": scoring_profile,
             "ram_score": ram_score,
             "storage_score": storage_score,

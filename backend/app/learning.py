@@ -50,6 +50,17 @@ def init_db() -> None:
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS learned_gpu (
+                pattern TEXT PRIMARY KEY,
+                label TEXT NOT NULL,
+                score INTEGER NOT NULL,
+                seen_count INTEGER NOT NULL,
+                updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
 
 
 def record_observation(payload: dict[str, Any], result: dict[str, Any], url: str | None = None) -> dict[str, Any]:
@@ -89,6 +100,8 @@ def detect_flags(result: dict[str, Any]) -> list[str]:
         flags.append("missing_storage")
     if not result.get("brand"):
         flags.append("missing_brand")
+    if result.get("gpu") and details.get("gpu_score", 0) == 0:
+        flags.append("unknown_gpu_score")
     if result.get("score", 100) < 65 and details.get("cpu_score", 0) >= 75:
         flags.append("low_score_good_cpu")
 
@@ -178,6 +191,7 @@ def get_suggestions(limit: int = 30) -> dict[str, Any]:
     cpu_counts: dict[str, dict[str, Any]] = {}
     brand_counts: dict[str, dict[str, Any]] = {}
     storage_snippets: dict[str, dict[str, Any]] = {}
+    gpu_counts: dict[str, dict[str, Any]] = {}
 
     for row in rows:
         title = row["title"] or ""
@@ -197,11 +211,17 @@ def get_suggestions(limit: int = 30) -> dict[str, Any]:
                 _bump(storage_snippets, snippet, title)
         if parsed.get("cpu") and parsed.get("details", {}).get("cpu_score") == 35:
             _bump(cpu_counts, parsed["cpu"], title)
+        if "unknown_gpu_score" in flags or not parsed.get("gpu"):
+            for gpu in _candidate_gpus(text):
+                _bump(gpu_counts, gpu, title)
+        if parsed.get("gpu") and parsed.get("details", {}).get("gpu_score") == 0:
+            _bump(gpu_counts, parsed["gpu"], title)
 
     return {
         "cpu_candidates": _top(cpu_counts, limit),
         "brand_candidates": _top(brand_counts, limit),
         "storage_snippets": _top(storage_snippets, limit),
+        "gpu_candidates": _top(gpu_counts, limit),
         "note": "Ces suggestions sont candidates: valide-les avant de les ajouter a parser.py/scoring.py.",
     }
 
@@ -232,6 +252,24 @@ def _candidate_brands(text: str) -> list[str]:
     return [item.strip() for item in known_shapes if item.strip() not in stop][:8]
 
 
+
+def _candidate_gpus(text: str) -> list[str]:
+    import re
+
+    upper = text.upper()
+    patterns = [
+        r"\bRTX\s*(?:PRO\s*)?\d{4}(?:\s*SUPER|\s*TI)?\b",
+        r"\bGTX\s*\d{4}(?:\s*SUPER|\s*TI)?\b",
+        r"\bRX\s*\d{4}(?:\s*XT|\s*XTX)?\b",
+        r"\bRADEON\s*\d{3,4}M\b",
+        r"\bARC\s*A\d{3,4}\b",
+    ]
+    found = []
+    for pattern in patterns:
+        found.extend(re.findall(pattern, upper, re.I))
+    return [" ".join(item.upper().split()) for item in found]
+
+
 def _candidate_storage_snippets(text: str) -> list[str]:
     import re
 
@@ -258,12 +296,13 @@ def _top(bucket: dict[str, dict[str, Any]], limit: int) -> list[dict[str, Any]]:
 
 AUTO_LEARN_INTERVAL_SECONDS = 300
 MIN_CPU_OCCURRENCES = 2
+MIN_GPU_OCCURRENCES = 2
 
 
 def auto_learn() -> dict[str, Any]:
     init_db()
     suggestions = get_suggestions(limit=100)
-    learned = {"cpu": [], "brand": []}
+    learned = {"cpu": [], "gpu": [], "brand": []}
 
     with sqlite3.connect(DB_PATH) as conn:
         for item in suggestions["cpu_candidates"]:
@@ -286,6 +325,27 @@ def auto_learn() -> dict[str, Any]:
                 (item["value"].upper(), label, score, item["count"]),
             )
             learned["cpu"].append({"pattern": item["value"], "label": label, "score": score, "count": item["count"]})
+
+        for item in suggestions["gpu_candidates"]:
+            if item["count"] < MIN_GPU_OCCURRENCES:
+                continue
+            label = _normalize_gpu_label(item["value"])
+            score = _estimate_gpu_score(label)
+            if not label or score is None:
+                continue
+            conn.execute(
+                """
+                INSERT INTO learned_gpu (pattern, label, score, seen_count)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(pattern) DO UPDATE SET
+                    label = excluded.label,
+                    score = excluded.score,
+                    seen_count = excluded.seen_count,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                (item["value"].upper(), label, score, item["count"]),
+            )
+            learned["gpu"].append({"pattern": item["value"], "label": label, "score": score, "count": item["count"]})
 
         for item in suggestions["brand_candidates"]:
             if item["count"] < 3:
@@ -321,6 +381,11 @@ def apply_learned_rules(parsed: dict[str, Any], text: str) -> dict[str, Any]:
                 if row["pattern"] in upper:
                     updated["cpu"] = row["label"]
                     break
+        if not updated.get("gpu"):
+            for row in conn.execute("SELECT pattern, label FROM learned_gpu ORDER BY seen_count DESC"):
+                if row["pattern"] in upper:
+                    updated["gpu"] = row["label"]
+                    break
         if not updated.get("brand"):
             for row in conn.execute("SELECT pattern, label FROM learned_brand ORDER BY seen_count DESC"):
                 if row["pattern"] in upper:
@@ -338,13 +403,22 @@ def get_learned_cpu_scores() -> dict[str, int]:
     return {row["label"]: row["score"] for row in rows}
 
 
+def get_learned_gpu_scores() -> dict[str, int]:
+    init_db()
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute("SELECT label, score FROM learned_gpu").fetchall()
+    return {row["label"]: row["score"] for row in rows}
+
+
 def get_learned_rules() -> dict[str, Any]:
     init_db()
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         cpus = conn.execute("SELECT pattern, label, score, seen_count, updated_at FROM learned_cpu ORDER BY seen_count DESC").fetchall()
         brands = conn.execute("SELECT pattern, label, seen_count, updated_at FROM learned_brand ORDER BY seen_count DESC").fetchall()
-    return {"cpu": [_row_to_dict(row) for row in cpus], "brand": [_row_to_dict(row) for row in brands]}
+        gpus = conn.execute("SELECT pattern, label, score, seen_count, updated_at FROM learned_gpu ORDER BY seen_count DESC").fetchall()
+    return {"cpu": [_row_to_dict(row) for row in cpus], "gpu": [_row_to_dict(row) for row in gpus], "brand": [_row_to_dict(row) for row in brands]}
 
 
 def _normalize_cpu_label(value: str) -> str | None:
@@ -414,4 +488,71 @@ def _estimate_cpu_score(label: str) -> int | None:
         return 30 if label in {"Intel N100", "Intel N150"} else 12
     if "Celeron" in label or "Pentium" in label:
         return 10
+    return None
+
+
+def _normalize_gpu_label(value: str) -> str | None:
+    import re
+
+    upper = " ".join(value.upper().replace("-", " ").split())
+    rtx = re.search(r"\bRTX\s*(?:PRO\s*)?(\d{4})(?:\s*(SUPER|TI))?\b", upper)
+    if rtx:
+        suffix = f" {rtx.group(2)}" if rtx.group(2) else ""
+        return f"RTX {rtx.group(1)}{suffix}"
+    gtx = re.search(r"\bGTX\s*(\d{4})(?:\s*(SUPER|TI))?\b", upper)
+    if gtx:
+        suffix = f" {gtx.group(2)}" if gtx.group(2) else ""
+        return f"GTX {gtx.group(1)}{suffix}"
+    rx = re.search(r"\bRX\s*(\d{4})(?:\s*(XT|XTX))?\b", upper)
+    if rx:
+        suffix = f" {rx.group(2)}" if rx.group(2) else ""
+        return f"RX {rx.group(1)}{suffix}"
+    arc = re.search(r"\bARC\s*(A\d{3,4})\b", upper)
+    if arc:
+        return f"Intel Arc {arc.group(1)}"
+    radeon = re.search(r"\bRADEON\s*(\d{3,4}M)\b", upper)
+    if radeon:
+        return f"Radeon {radeon.group(1)}"
+    return None
+
+
+def _estimate_gpu_score(label: str) -> int | None:
+    import re
+
+    model = re.search(r"(\d{4})", label)
+    if not model:
+        return None
+    number = int(model.group(1))
+    if label.startswith("RTX"):
+        generation = number // 1000
+        tier = number % 1000
+        base = {50: 92, 40: 72, 30: 50, 20: 38, 10: 18}.get(generation * 10, 35)
+        if tier >= 900:
+            return min(100, base + 18)
+        if tier >= 800:
+            return min(100, base + 12)
+        if tier >= 700:
+            return min(100, base + 5)
+        if tier <= 600:
+            return max(10, base - 8)
+        return base
+    if label.startswith("GTX"):
+        if number >= 1660:
+            return 36
+        if number >= 1650:
+            return 24
+        return 16
+    if label.startswith("RX"):
+        generation = number // 1000
+        tier = number % 1000
+        base = {7: 58, 6: 45, 5: 25}.get(generation, 35)
+        if tier >= 900:
+            return min(100, base + 20)
+        if tier >= 800:
+            return min(100, base + 12)
+        if tier >= 700:
+            return min(100, base + 5)
+        return base
+    if "Arc" in label:
+        return 55
     return None
