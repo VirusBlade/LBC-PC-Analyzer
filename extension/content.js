@@ -239,7 +239,8 @@
   }
 
   function buildTooltip(data) {
-    const parts = [data.verdict, data.cpu, data.ram_gb ? `${data.ram_gb} Go RAM` : null, data.storage_label, data.reason];
+    const ramLabel = data.ram_gb ? `${data.ram_gb} Go RAM${data.ram_type ? ` ${data.ram_type}` : ""}${data.ram_speed_mhz ? ` ${data.ram_speed_mhz}MHz` : ""}` : null;
+    const parts = [data.verdict, data.cpu, data.gpu, ramLabel, data.storage_label, data.reason];
     if (data.details) {
       parts.push(formatScoreDetails(data.details));
     }
@@ -308,6 +309,9 @@
       cpu: data.cpu || null,
       ram_gb: data.ram_gb || null,
       storage_label: data.storage_label || null,
+      gpu: data.gpu || null,
+      ram_type: data.ram_type || null,
+      ram_speed_mhz: data.ram_speed_mhz || null,
       score: data.score,
       verdict: data.verdict,
       reason: data.reason,
@@ -413,7 +417,8 @@
       ["Marque", data.brand || "Inconnue"],
       ["Modele", data.model || "Inconnu"],
       ["CPU", data.cpu || "Inconnu"],
-      ["RAM", data.ram_gb ? `${data.ram_gb} Go` : "Inconnue"],
+      ["GPU", data.gpu || "Aucun / inconnu"],
+      ["RAM", data.ram_gb ? `${data.ram_gb} Go${data.ram_type ? ` ${data.ram_type}` : ""}${data.ram_speed_mhz ? ` ${data.ram_speed_mhz}MHz` : ""}` : "Inconnue"],
       ["Disque", data.storage_label || "Inconnu"],
       ["Score", `${data.score}/100`],
       ["Verdict", data.verdict],

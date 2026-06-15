@@ -143,6 +143,45 @@ def extract_ram_gb(text: str) -> int | None:
     return max(candidates) if candidates else None
 
 
+
+def extract_ram_details(text: str) -> dict[str, Any]:
+    ram_type = None
+    ram_speed_mhz = None
+
+    type_match = re.search(r"\b(DDR[345])\b", text, re.I)
+    if type_match:
+        ram_type = type_match.group(1).upper()
+
+    speed_patterns = [
+        r"\b(DDR[345])[-\s]*(\d{4,5})\s*(?:MHZ)?\b",
+        r"\b(\d{4,5})\s*MHZ\b",
+    ]
+    for pattern in speed_patterns:
+        match = re.search(pattern, text, re.I)
+        if match:
+            ram_speed_mhz = int(match.group(match.lastindex))
+            break
+
+    return {"ram_type": ram_type, "ram_speed_mhz": ram_speed_mhz}
+
+
+def extract_gpu(text: str) -> str | None:
+    upper = text.upper()
+    patterns = [
+        (r"\bRTX\s*(5090|5080|5070|4070|4060|3090|3080|3070|3060|2080|2070|2060)\b", "RTX {}"),
+        (r"\bGTX\s*(1660\s*SUPER|1660|1650|1050\s*TI)\b", "GTX {}"),
+        (r"\bRX\s*(7900\s*XTX|7800\s*XT|7700\s*XT|7600|6800\s*XT|6700\s*XT|6600)\b", "RX {}"),
+        (r"\bRADEON\s*(780M)\b", "Radeon {}"),
+        (r"\bARC\s*(A770|A750)\b", "Intel Arc {}"),
+    ]
+    for pattern, template in patterns:
+        match = re.search(pattern, upper, re.I)
+        if match:
+            value = re.sub(r"\s+", " ", match.group(1).upper()).strip()
+            return template.format(value)
+    return None
+
+
 def _size_to_gb(value: str, unit: str) -> int:
     number = float(value.replace(",", "."))
     normalized_unit = unit.lower()
@@ -206,6 +245,8 @@ def extract_storage(text: str) -> dict[str, Any]:
 def _storage_kind_from_token(token: str) -> str:
     if token in {"NVME", "NVME", "M.2", "M2"}:
         return "NVMe"
+    if token == "SATA":
+        return "SATA SSD"
     if token in {"HDD", "DD"}:
         return "HDD"
     if token == "EMMC":
@@ -230,7 +271,9 @@ def parse_listing(title: str, price: Any = None, description: str = "") -> dict[
     brand = extract_brand(text)
     cpu = extract_cpu(text)
     ram_gb = extract_ram_gb(text)
+    ram_details = extract_ram_details(text)
     storage = extract_storage(text)
+    gpu = extract_gpu(text)
     parsed_price = parse_price(price, text)
 
     return {
@@ -238,6 +281,9 @@ def parse_listing(title: str, price: Any = None, description: str = "") -> dict[
         "model": extract_model(title, brand, cpu),
         "cpu": cpu,
         "ram_gb": ram_gb,
+        "ram_type": ram_details["ram_type"],
+        "ram_speed_mhz": ram_details["ram_speed_mhz"],
+        "gpu": gpu,
         "storage_type": storage["type"],
         "storage_gb": storage["size_gb"],
         "storage_label": storage["label"],

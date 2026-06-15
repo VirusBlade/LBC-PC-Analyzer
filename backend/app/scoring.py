@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from .benchmarks import cpu_score_from_benchmark
+from .benchmarks import cpu_score_from_benchmark, gpu_score_from_benchmark
 
 
 CPU_TABLE = {
@@ -45,16 +45,29 @@ TRUSTED_BRANDS = {"Beelink", "Lenovo", "HP", "Shuttle", "Minisforum"}
 PENALIZED_CPUS = {"Intel N100", "Intel N150", "Intel N4000", "Intel G630", "AMD A10", "Intel i5-8500T", "Intel i5-6500T", "Intel i3-7th gen"}
 
 
-def _ram_score(ram_gb: int | None) -> int:
+def _ram_score(ram_gb: int | None, ram_type: str | None = None, ram_speed_mhz: int | None = None) -> int:
     if not ram_gb:
         return 25
-    if ram_gb >= 32:
-        return 100
-    if ram_gb >= 16:
-        return 78
-    if ram_gb >= 8:
-        return 48
-    return 20
+    if ram_gb >= 64:
+        score = 100
+    elif ram_gb >= 32:
+        score = 92
+    elif ram_gb >= 16:
+        score = 76
+    elif ram_gb >= 8:
+        score = 45
+    else:
+        score = 20
+
+    if ram_type == "DDR5":
+        score += 5
+    elif ram_type == "DDR3":
+        score -= 8
+    if ram_speed_mhz and ram_speed_mhz >= 5600:
+        score += 3
+    elif ram_speed_mhz and ram_speed_mhz < 2666:
+        score -= 5
+    return max(0, min(100, score))
 
 
 def _storage_score(storage_gb: int | None, storage_type: str | None) -> int:
@@ -67,6 +80,8 @@ def _storage_score(storage_gb: int | None, storage_type: str | None) -> int:
         score = 100
     if storage_type == "HDD":
         score -= 25
+    if storage_type == "SATA SSD":
+        score -= 3
     if storage_type == "NVMe":
         score += 5
     return max(0, min(100, score))
@@ -124,11 +139,19 @@ def score_listing(parsed: dict[str, Any], learned_cpu_scores: dict[str, int] | N
     else:
         cpu_score = cpu_scores.get(cpu, 35)
         cpu_score_source = "manual" if cpu in CPU_TABLE else "fallback"
-    ram_score = _ram_score(parsed.get("ram_gb"))
+    gpu_score, gpu_benchmark = gpu_score_from_benchmark(parsed.get("gpu"))
+    gpu_score = gpu_score if gpu_score is not None else 0
+    ram_score = _ram_score(parsed.get("ram_gb"), parsed.get("ram_type"), parsed.get("ram_speed_mhz"))
     storage_score = _storage_score(parsed.get("storage_gb"), parsed.get("storage_type"))
-    price_score = _price_score(parsed.get("price"), cpu_score, parsed.get("ram_gb"), parsed.get("storage_gb"))
+    price_score = _price_score(parsed.get("price"), cpu_score + gpu_score * 0.45, parsed.get("ram_gb"), parsed.get("storage_gb"))
 
-    score = cpu_score * 0.5 + ram_score * 0.2 + storage_score * 0.1 + price_score * 0.2
+    has_dedicated_gpu = parsed.get("gpu") and gpu_score >= 30
+    if has_dedicated_gpu:
+        score = cpu_score * 0.35 + gpu_score * 0.3 + ram_score * 0.15 + storage_score * 0.1 + price_score * 0.1
+        scoring_profile = "desktop_gpu"
+    else:
+        score = cpu_score * 0.5 + ram_score * 0.2 + storage_score * 0.1 + price_score * 0.2
+        scoring_profile = "mini_pc"
     adjustments = []
 
     if cpu in PENALIZED_CPUS:
@@ -140,6 +163,11 @@ def score_listing(parsed: dict[str, Any], learned_cpu_scores: dict[str, int] | N
     if parsed.get("ram_gb") and parsed["ram_gb"] >= 32:
         score += 4
         adjustments.append("32 Go de RAM ou plus")
+    if parsed.get("ram_type") == "DDR5":
+        score += 2
+        adjustments.append("DDR5")
+    if has_dedicated_gpu:
+        adjustments.append("GPU dedie")
     if parsed.get("storage_gb") and parsed["storage_gb"] >= 512 and parsed.get("storage_type") in {"SSD", "NVMe"}:
         score += 3
         adjustments.append("SSD confortable")
@@ -158,6 +186,9 @@ def score_listing(parsed: dict[str, Any], learned_cpu_scores: dict[str, int] | N
             "cpu_mark": benchmark.get("cpu_mark") if benchmark else None,
             "cpu_single_thread": benchmark.get("single_thread") if benchmark else None,
             "cpu_tier": benchmark.get("tier") if benchmark else None,
+            "gpu_score": gpu_score,
+            "gpu_tier": gpu_benchmark.get("tier") if gpu_benchmark else None,
+            "scoring_profile": scoring_profile,
             "ram_score": ram_score,
             "storage_score": storage_score,
             "price_score": price_score,
@@ -170,11 +201,12 @@ def _reason(parsed: dict[str, Any], verdict: str, adjustments: list[str], price_
     cpu = parsed.get("cpu") or "CPU non identifie"
     ram = f"{parsed['ram_gb']} Go RAM" if parsed.get("ram_gb") else "RAM inconnue"
     storage = parsed.get("storage_label") or "stockage inconnu"
+    gpu = f", {parsed['gpu']}" if parsed.get("gpu") else ""
 
     if verdict == "À éviter":
-        return f"{cpu}, {ram}, {storage}: rapport prix/performance faible."
+        return f"{cpu}{gpu}, {ram}, {storage}: rapport prix/performance faible."
     if price_score >= 80:
-        return f"{cpu}, {ram}, {storage}: prix attractif pour cette configuration."
+        return f"{cpu}{gpu}, {ram}, {storage}: prix attractif pour cette configuration."
     if adjustments:
-        return f"{cpu}, {ram}, {storage}: {', '.join(adjustments[:2])}."
-    return f"{cpu}, {ram}, {storage}: configuration coherente mais prix a verifier."
+        return f"{cpu}{gpu}, {ram}, {storage}: {', '.join(adjustments[:2])}."
+    return f"{cpu}{gpu}, {ram}, {storage}: configuration coherente mais prix a verifier."

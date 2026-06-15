@@ -1,6 +1,6 @@
 # LBC Mini-PC Analyzer
 
-Extension Chrome + backend FastAPI pour analyser localement les annonces Leboncoin de mini-PC.
+Extension Chrome + backend FastAPI pour analyser localement les annonces Leboncoin de mini-PC et PC fixes.
 
 L'extension lit les annonces visibles, le backend extrait les composants avec des regex et une table CPU locale, puis calcule un score de rentabilite sur 100. Aucune IA externe n'est utilisee et rien n'est envoye hors de ta machine.
 
@@ -9,7 +9,7 @@ L'extension lit les annonces visibles, le backend extrait les composants avec de
 - Extension Chrome Manifest V3 injectee sur `leboncoin.fr`.
 - Analyse automatique sur les pages annonce ordinateur/informatique.
 - Badges de score discrets sur les pages de recherche, avec tooltip au survol.
-- Encart detaille sur les pages annonce : marque, modele, CPU, RAM, stockage, score, verdict et raison.
+- Encart detaille sur les pages annonce : marque, modele, CPU, GPU, RAM, stockage, score, verdict et raison.
 - Historique local des 20 dernieres analyses.
 - Favoris stockes dans `chrome.storage.local`.
 - Backend local FastAPI sur `http://localhost:8000`.
@@ -165,3 +165,29 @@ python3 -m pytest
 - Les selecteurs Leboncoin peuvent changer.
 - Les badges de recherche dependent de la structure HTML courante des cartes.
 - Les suggestions d'apprentissage doivent etre validees avant integration.
+
+
+## PC fixes et GPU
+
+La logique couvre aussi les PC fixes non portables :
+
+- extraction GPU dedie : RTX, GTX, Radeon RX, Radeon 780M, Intel Arc ;
+- extraction RAM avancee : DDR3/DDR4/DDR5 et frequence MHz ;
+- extraction stockage : NVMe, M.2, SATA SSD, HDD, eMMC ;
+- profil de scoring `desktop_gpu` quand un GPU dedie est detecte.
+
+Base GPU benchmark :
+
+```text
+backend/app/gpu_benchmarks.json
+```
+
+Quand un GPU dedie est detecte, le scoring utilise environ :
+
+- CPU : 35 %
+- GPU : 30 %
+- RAM : 15 %
+- stockage : 10 %
+- prix : 10 %
+
+Sans GPU dedie, le profil mini-PC reste utilise.

@@ -23,3 +23,17 @@ def test_learned_cpu_score_overrides_benchmark_when_present():
 
     assert result["details"]["cpu_score"] == 88
     assert result["details"]["cpu_score_source"] == "learned"
+
+
+def test_desktop_gpu_scoring_profile_uses_gpu():
+    parsed = parse_listing(
+        "PC gamer i5 12400 RTX 3060 16 Go DDR4 3200 SSD NVMe 1To",
+        650,
+        "Tour fixe gaming avec RTX 3060.",
+    )
+
+    result = score_listing(parsed)
+
+    assert parsed["gpu"] == "RTX 3060"
+    assert result["details"]["gpu_score"] == 58
+    assert result["details"]["scoring_profile"] == "desktop_gpu"
