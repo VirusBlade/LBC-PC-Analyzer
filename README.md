@@ -222,3 +222,40 @@ Le scoring applique maintenant un ajustement par marque :
 - malus leger : Chuwi, NiPoGi, Acemagic.
 
 Le detail est visible dans `details.brand_adjustment` et dans les raisons du score.
+
+
+## API Cloudflare Worker + D1
+
+Une version hebergee de l'API est preparee dans `worker/` pour permettre une extension utilisable sans backend local.
+
+Architecture cible :
+
+```text
+Extension Chrome -> Cloudflare Worker -> Cloudflare D1
+```
+
+Commandes :
+
+```bash
+cd worker
+npm install
+wrangler d1 migrations apply lbc_minipc --remote
+wrangler deploy
+```
+
+Endpoints Worker :
+
+- `GET /health`
+- `POST /analyze`
+- `GET /learning/stats`
+- `GET /learning/examples`
+- `GET /learning/rules`
+
+D1 contient :
+
+- `observations`
+- `learned_cpu`
+- `learned_gpu`
+- `learned_brand`
+
+Avant le premier deploy public, le compte Cloudflare doit avoir un sous-domaine `workers.dev` actif, ou un route/custom domain configure dans `wrangler.toml`.

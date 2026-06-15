@@ -1,0 +1,11 @@
+name = "lbc-minipc-api"
+main = "src/index.ts"
+compatibility_date = "2026-06-15"
+
+[observability]
+enabled = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "lbc_minipc"
+database_id = "2257df25-e87e-40ad-9e7f-b09e3ec9f523"
