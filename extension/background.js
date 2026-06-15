@@ -1,4 +1,5 @@
-const API_URL = "http://localhost:8000/analyze";
+const DEFAULT_API_BASE = "http://localhost:8000";
+const API_BASE_KEY = "lbcmp_api_base";
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (!message || message.type !== "LBCPC_ANALYZE") {
@@ -18,7 +19,8 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 });
 
 async function analyze(payload) {
-  const response = await fetch(API_URL, {
+  const apiBase = await getApiBase();
+  const response = await fetch(`${apiBase}/analyze`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -29,4 +31,12 @@ async function analyze(payload) {
   }
 
   return response.json();
+}
+
+function getApiBase() {
+  return new Promise((resolve) => {
+    chrome.storage.local.get({ [API_BASE_KEY]: DEFAULT_API_BASE }, (data) => {
+      resolve(String(data[API_BASE_KEY] || DEFAULT_API_BASE).replace(/\/+$/, ""));
+    });
+  });
 }

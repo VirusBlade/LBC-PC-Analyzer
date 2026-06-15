@@ -228,6 +228,14 @@ Le detail est visible dans `details.brand_adjustment` et dans les raisons du sco
 
 Une version hebergee de l'API est preparee dans `worker/` pour permettre une extension utilisable sans backend local.
 
+Par defaut, l'extension utilise encore `http://localhost:8000` pour eviter de publier une URL Cloudflare personnelle dans le depot. Pour utiliser l'API Cloudflare, renseigne l'URL publique dans le stockage de l'extension :
+
+```js
+chrome.storage.local.set({ lbcmp_api_base: "https://TON-API-PUBLIQUE" })
+```
+
+Ensuite recharge l'extension et la page Leboncoin.
+
 Architecture cible :
 
 ```text
