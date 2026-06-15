@@ -13,7 +13,7 @@ from .scoring import score_listing
 from .learning import AUTO_LEARN_INTERVAL_SECONDS, apply_learned_rules, auto_learn, get_examples, get_learned_cpu_scores, get_learned_gpu_scores, get_learned_rules, get_stats, get_suggestions, init_db, record_observation
 
 
-app = FastAPI(title="LBC Mini-PC Analyzer", version="0.2.0")
+app = FastAPI(title="LBC PC Analyzer", version="0.2.0")
 
 app.add_middleware(
     CORSMiddleware,

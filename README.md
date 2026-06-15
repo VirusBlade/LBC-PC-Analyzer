@@ -1,6 +1,6 @@
-# LBC Mini-PC Analyzer
+# LBC PC Analyzer
 
-Extension Chrome + backend FastAPI pour analyser localement les annonces Leboncoin de mini-PC et PC fixes.
+Extension Chrome + backend FastAPI pour analyser localement les annonces Leboncoin de PC fixes, mini-PC et configurations avec GPU dedie.
 
 L'extension lit les annonces visibles, le backend extrait les composants avec des regex et une table CPU locale, puis calcule un score de rentabilite sur 100. Aucune IA externe n'est utilisee et rien n'est envoye hors de ta machine.
 
@@ -190,7 +190,7 @@ Quand un GPU dedie est detecte, le scoring utilise environ :
 - stockage : 10 %
 - prix : 10 %
 
-Sans GPU dedie, le profil mini-PC reste utilise.
+Sans GPU dedie, le profil PC compact reste utilise.
 
 
 ## GPU et VideoCardBenchmark
@@ -217,7 +217,7 @@ L'auto-apprentissage fonctionne aussi pour les GPU :
 Le scoring applique maintenant un ajustement par marque :
 
 - bonus fort : Lenovo, HP, Dell, Shuttle ;
-- bonus mini-PC : Minisforum, Beelink, Geekom ;
+- bonus PC compact : Minisforum, Beelink, Geekom ;
 - bonus leger : GMKtec, MSI, Asus, Intel ;
 - malus leger : Chuwi, NiPoGi, Acemagic.
 
@@ -239,7 +239,7 @@ Commandes :
 ```bash
 cd worker
 npm install
-wrangler d1 migrations apply lbc_minipc --remote
+wrangler d1 migrations apply lbc_pc --remote
 wrangler deploy
 ```
 

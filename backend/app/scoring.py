@@ -46,10 +46,10 @@ BRAND_ADJUSTMENTS = {
     "HP": (5, "marque pro fiable"),
     "Dell": (5, "marque pro fiable"),
     "Shuttle": (5, "marque pro fiable"),
-    "Minisforum": (4, "bonne marque mini-PC"),
-    "Beelink": (4, "bonne marque mini-PC"),
-    "GMKtec": (2, "marque mini-PC correcte"),
-    "Geekom": (3, "bonne marque mini-PC"),
+    "Minisforum": (4, "bonne marque PC compact"),
+    "Beelink": (4, "bonne marque PC compact"),
+    "GMKtec": (2, "marque PC compact correcte"),
+    "Geekom": (3, "bonne marque PC compact"),
     "MSI": (3, "bonne marque PC"),
     "Asus": (3, "bonne marque PC"),
     "Acer": (1, "marque correcte"),
@@ -177,7 +177,7 @@ def score_listing(parsed: dict[str, Any], learned_cpu_scores: dict[str, int] | N
         scoring_profile = "desktop_gpu"
     else:
         score = cpu_score * 0.5 + ram_score * 0.2 + storage_score * 0.1 + price_score * 0.2
-        scoring_profile = "mini_pc"
+        scoring_profile = "compact_pc"
     adjustments = []
 
     if cpu in PENALIZED_CPUS:

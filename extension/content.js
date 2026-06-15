@@ -1,6 +1,6 @@
 (function () {
   const API_URL = "http://localhost:8000/analyze";
-  const ROOT_ID = "lbc-mini-pc-analyzer";
+  const ROOT_ID = "lbc-pc-analyzer";
   const HISTORY_KEY = "lbcmp_history";
   const FAVORITES_KEY = "lbcmp_favorites";
   const MAX_HISTORY = 20;
@@ -35,7 +35,7 @@
   root.hidden = true;
   root.innerHTML = `
     <div class="lbcmp-header">
-      <strong>Analyse mini-PC</strong>
+      <strong>Analyse PC</strong>
       <span class="lbcmp-pill">Auto</span>
     </div>
     <div class="lbcmp-status">Detection de l'annonce...</div>
@@ -196,7 +196,7 @@
     const badge = document.createElement("span");
     badge.className = "lbcmp-search-badge is-loading";
     badge.textContent = "...";
-    badge.title = "Analyse mini-PC en cours";
+    badge.title = "Analyse PC en cours";
 
     const host = card;
     host.classList.add("lbcmp-search-host");

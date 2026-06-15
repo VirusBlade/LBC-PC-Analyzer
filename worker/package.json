@@ -1,5 +1,5 @@
 {
-  "name": "lbc-minipc-worker",
+  "name": "lbc-pc-worker",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -7,8 +7,8 @@
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "types": "wrangler types",
-    "d1:migrate:local": "wrangler d1 migrations apply lbc_minipc --local",
-    "d1:migrate": "wrangler d1 migrations apply lbc_minipc --remote"
+    "d1:migrate:local": "wrangler d1 migrations apply lbc_pc --local",
+    "d1:migrate": "wrangler d1 migrations apply lbc_pc --remote"
   },
   "devDependencies": {
     "typescript": "^5.6.3",
