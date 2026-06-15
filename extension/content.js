@@ -1,5 +1,4 @@
 (function () {
-  const API_URL = "http://localhost:8000/analyze";
   const ROOT_ID = "lbc-pc-analyzer";
   const HISTORY_KEY = "lbcmp_history";
   const FAVORITES_KEY = "lbcmp_favorites";
@@ -121,25 +120,33 @@
       actions.hidden = false;
     } catch (error) {
       currentItem = null;
-      status.textContent = "Backend local indisponible sur localhost:8000.";
-      resultBox.innerHTML = `<p>${escapeHtml(error.message || "Lance le backend puis recharge la page.")}</p>`;
+      status.textContent = "Backend local non joignable.";
+      resultBox.innerHTML = `<p>${escapeHtml(apiErrorMessage(error))}</p>`;
       resultBox.hidden = false;
       actions.hidden = true;
     }
   }
 
   async function analyzePayload(payload) {
-    const response = await fetch(API_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Backend indisponible (${response.status})`);
+    if (!chrome?.runtime?.sendMessage) {
+      throw new Error("Extension non disponible. Recharge l'extension Chrome.");
     }
 
-    return response.json();
+    const response = await new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage({ type: "LBCPC_ANALYZE", payload }, (reply) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+          return;
+        }
+        resolve(reply);
+      });
+    });
+
+    if (!response?.ok) {
+      throw new Error(response?.error || "Backend local indisponible");
+    }
+
+    return response.data;
   }
 
   function isAdPage() {
@@ -217,8 +224,9 @@
     } catch (_error) {
       badge.classList.remove("is-loading");
       badge.classList.add("is-error");
-      badge.textContent = "API";
-      badge.title = "Backend local indisponible sur localhost:8000";
+      badge.textContent = "OFF";
+      badge.title = "Backend local non joignable. Lance FastAPI sur localhost:8000.";
+      badge.dataset.tooltip = badge.title;
     }
   }
 
@@ -410,6 +418,11 @@
 
   function clean(value) {
     return String(value || "").replace(/\s+/g, " ").trim();
+  }
+
+  function apiErrorMessage(error) {
+    const details = error?.message ? ` (${error.message})` : "";
+    return `Lance le backend FastAPI sur http://localhost:8000 puis recharge la page${details}.`;
   }
 
   function renderResult(data) {
