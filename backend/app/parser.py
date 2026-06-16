@@ -145,17 +145,21 @@ def extract_cpu(text: str) -> str | None:
 
 def extract_ram_gb(text: str) -> int | None:
     candidates: list[int] = []
+    storage_words = r"SSD|NVME|HDD|STOCKAGE|DISQUE|STORAGE|ROM|EMMC|SATA|M\.2|M2|DD"
 
     for left, right in re.findall(r"\b(\d{1,2})\s*x\s*(\d{1,2})\b", text, re.I):
         candidates.append(int(left) * int(right))
 
     for match in re.finditer(r"\b(\d{1,3})\s*(?:GO|GB)\b", text, re.I):
-        before = text[max(0, match.start() - 24) : match.start()]
-        after = text[match.end() : min(len(text), match.end() + 10)]
+        before = text[max(0, match.start() - 42) : match.start()]
+        after = text[match.end() : min(len(text), match.end() + 28)]
         gb = int(match.group(1))
-        storage_before = r"\b(SSD|NVME|HDD|STOCKAGE|DISQUE|STORAGE|ROM|EMMC|SATA|M\.2|M2|DD)\s*(?::|de|d\'|avec|en)?\s*$"
-        storage_after = r"^\s*(SSD|NVME|HDD|ROM|EMMC|SATA|M\.2|M2|DD)\b"
-        if re.search(storage_before, before, re.I) or (gb >= 64 and re.search(storage_after, after, re.I)):
+        context = f"{before} {match.group(0)} {after}"
+        ram_context = re.search(r"\b(RAM|DDR\d?|MEMOIRE|MÉMOIRE|MEMORY|BARRETTE|SO\s*DIMM|SODIMM)\b", context, re.I)
+        storage_context = re.search(storage_words, context, re.I)
+        storage_before = rf"\b({storage_words})\s*(?::|de|d\'|avec|en)?\s*$"
+        storage_after = rf"^\s*(SSD|NVME|HDD|ROM|EMMC|SATA|M\.2|M2|DD)\b"
+        if re.search(storage_before, before, re.I) or (gb >= 64 and (re.search(storage_after, after, re.I) or (storage_context and not ram_context))):
             continue
         if 2 <= gb <= 128:
             candidates.append(gb)
@@ -189,7 +193,7 @@ def extract_gpu(text: str) -> str | None:
     upper = text.upper()
     patterns = [
         (r"\bRTX\s*(5090|5080|5070|4070|4060|3090|3080|3070|3060|2080|2070|2060)\b", "RTX {}"),
-        (r"\bGTX\s*(1660\s*SUPER|1660|1650|1050\s*TI)\b", "GTX {}"),
+        (r"\bGTX\s*(1660\s*SUPER|1660|1650|1060|1050\s*TI)\b", "GTX {}"),
         (r"\bRX\s*(7900\s*XTX|7800\s*XT|7700\s*XT|7600|6800\s*XT|6750\s*XT|6700\s*XT|6600|5700\s*XT)\b", "RX {}"),
         (r"\bRADEON\s*(780M)\b", "Radeon {}"),
         (r"\bARC\s*(A770|A750)\b", "Intel Arc {}"),

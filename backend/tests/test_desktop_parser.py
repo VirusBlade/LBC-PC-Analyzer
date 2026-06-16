@@ -54,6 +54,30 @@ def test_parse_desktop_pc_with_radeon_rx_5700_xt_without_space():
     assert parsed["storage_gb"] == 1024
 
 
+def test_parse_custom_pc_does_not_confuse_ssd_120go_with_ram():
+    parsed = parse_listing(
+        "PC gamer i5-7400 GTX 1060",
+        "250 €",
+        """
+        Carte Mère :MSI H110m pro-vd
+        Processeur : Intel Core i5-7400
+        Mémoire Ram : Corsair Vengeance LPX DDR4 RAM 32Go (2x16Go)
+        Carte Graphique : MSI GTX 1060 GAMING X
+        SSD Corsair 120 GO ( Windows 11 pro installé dessus )
+        SSD 120 GO
+        HDD 1 TO
+        Alimentation 550 W
+        """,
+    )
+
+    assert parsed["cpu"] == "Intel i5-7400"
+    assert parsed["gpu"] == "GTX 1060"
+    assert parsed["ram_gb"] == 32
+    assert parsed["ram_type"] == "DDR4"
+    assert parsed["storage_gb"] == 1024
+    assert parsed["storage_type"] == "HDD"
+
+
 def test_custom_pc_does_not_use_motherboard_brand():
     parsed = parse_listing(
         "PC custom Ryzen 5 5600 RX 6750 XT 32 Go",
