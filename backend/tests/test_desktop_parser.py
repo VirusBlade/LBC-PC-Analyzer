@@ -78,6 +78,24 @@ def test_parse_custom_pc_does_not_confuse_ssd_120go_with_ram():
     assert parsed["storage_type"] == "HDD"
 
 
+def test_parse_installed_ram_ignores_max_supported_ram():
+    parsed = parse_listing(
+        "Intel NUC",
+        "120 €",
+        """
+        Processeur : Intel Core i3-8109U
+        Mémoire vive (RAM) : --> 16 Go (extension possible jusqu'à 32 Go max; barrettes SO-DIMM DDR4-2400)
+        Baie de stockage 2,5\" : --> 180 Go Intel SSD
+        """,
+    )
+
+    assert parsed["cpu"] == "Intel i3-8109U"
+    assert parsed["ram_gb"] == 16
+    assert parsed["ram_type"] == "DDR4"
+    assert parsed["ram_speed_mhz"] == 2400
+    assert parsed["storage_label"] == "SSD 180 Go"
+
+
 def test_custom_pc_does_not_use_motherboard_brand():
     parsed = parse_listing(
         "PC custom Ryzen 5 5600 RX 6750 XT 32 Go",

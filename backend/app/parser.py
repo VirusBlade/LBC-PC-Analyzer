@@ -157,6 +157,8 @@ def extract_ram_gb(text: str) -> int | None:
         context = f"{before} {match.group(0)} {after}"
         ram_context = re.search(r"\b(RAM|DDR\d?|MEMOIRE|MÉMOIRE|MEMORY|BARRETTE|SO\s*DIMM|SODIMM)\b", context, re.I)
         storage_context = re.search(storage_words, context, re.I)
+        if re.search(r"\b(jusqu['’]?a|jusqu[àa]|max(?:imum)?|extension\s+possible|supporte?)\b", before, re.I):
+            continue
         storage_before = rf"\b({storage_words})\s*(?::|de|d\'|avec|en)?\s*$"
         storage_after = rf"^\s*(SSD|NVME|HDD|ROM|EMMC|SATA|M\.2|M2|DD)\b"
         if re.search(storage_before, before, re.I) or (gb >= 64 and (re.search(storage_after, after, re.I) or (storage_context and not ram_context))):
