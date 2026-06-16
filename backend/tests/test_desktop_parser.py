@@ -96,6 +96,31 @@ def test_parse_installed_ram_ignores_max_supported_ram():
     assert parsed["storage_label"] == "SSD 180 Go"
 
 
+def test_parse_old_gamer_tower_i7_4790k_gtx_970():
+    parsed = parse_listing(
+        "PC GAMER et Polyvalent petit prix",
+        "295€",
+        """
+        Le prix indiqué est pour la tour seule (295€)
+        pour le tout: tour écran, clavier, souris, HP; Le prix est 345€
+        Carte mère micro ATX
+        Cpu intel core I7 4790k à 4Ghz
+        16 Go ram DDr3
+        Carte graphique GTX 970 4go
+        SSD Samsung 500 go pour Windows11
+        HDD 1 to pour le stockage des jeux
+        """,
+    )
+
+    assert parsed["brand"] == "PC Custom"
+    assert parsed["cpu"] == "Intel i7-4790K"
+    assert parsed["gpu"] == "GTX 970"
+    assert parsed["ram_gb"] == 16
+    assert parsed["ram_type"] == "DDR3"
+    assert parsed["storage_gb"] == 1024
+    assert parsed["storage_type"] == "HDD"
+
+
 def test_custom_pc_does_not_use_motherboard_brand():
     parsed = parse_listing(
         "PC custom Ryzen 5 5600 RX 6750 XT 32 Go",

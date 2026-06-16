@@ -27,6 +27,7 @@ CPU_TABLE = {
     "Ryzen 9 unknown": 75,
     "Intel i5-1135G7": 62,
     "Intel i7-6700HQ": 54,
+    "Intel i7-4790K": 34,
     "Intel i5-9500": 52,
     "Intel i5-7500": 45,
     "Intel i3-8109U": 38,
@@ -62,6 +63,7 @@ CPU_RELEASE_YEARS = {
     "Intel i5-1235U": 2022,
     "Intel i5-1135G7": 2020,
     "Intel i7-6700HQ": 2015,
+    "Intel i7-4790K": 2014,
     "Intel i5-9500": 2019,
     "Intel i5-7500": 2017,
     "Intel i3-8109U": 2018,
@@ -97,7 +99,7 @@ BRAND_ADJUSTMENTS = {
     "Acemagic": (-2, "marque a verifier"),
 }
 TRUSTED_BRANDS = {brand for brand, (delta, _reason) in BRAND_ADJUSTMENTS.items() if delta >= 4}
-PENALIZED_CPUS = {"Intel N100", "Intel N150", "Intel N4000", "Intel G630", "AMD A10", "Intel i5-8500T", "Intel i5-6500T", "Intel i3-8109U", "Intel i3-7th gen"}
+PENALIZED_CPUS = {"Intel N100", "Intel N150", "Intel N4000", "Intel G630", "AMD A10", "Intel i7-4790K", "Intel i5-8500T", "Intel i5-6500T", "Intel i3-8109U", "Intel i3-7th gen"}
 
 
 def cpu_release_year(cpu: str | None, benchmark: dict[str, Any] | None = None) -> int | None:

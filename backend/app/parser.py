@@ -82,7 +82,7 @@ def looks_like_custom_pc(text: str) -> bool:
         r"\b(?:boitier|alimentation|watercooling|ventirad)\b",
     ]
     return any(re.search(pattern, text, re.I) for pattern in custom_patterns) and not re.search(
-        r"\b(Beelink|Minisforum|GMKtec|Geekom|Chuwi|Lenovo|HP|Dell|Shuttle|NiPoGi|Acemagic|Ace\s+Magician)\b",
+        r"\b(Beelink|Minisforum|GMKtec|Geekom|Chuwi|Lenovo|Dell|Shuttle|NiPoGi|Acemagic|Ace\s+Magician)\b|\bHP\s+(?:EliteDesk|ProDesk|Pavilion|Compaq|Z\d|Elitedesk|Prodesk)\b",
         text,
         re.I,
     )
@@ -93,6 +93,8 @@ def extract_brand(text: str) -> str | None:
         return CUSTOM_PC_BRAND
 
     for brand in BRANDS:
+        if brand == "HP" and not re.search(r"\bHP\s+(?:EliteDesk|ProDesk|Pavilion|Compaq|Z\d|Elitedesk|Prodesk)\b", text, re.I):
+            continue
         if re.search(rf"\b{re.escape(brand)}\b", text, re.I):
             return "Acemagic" if brand == "Ace Magician" else brand
     return None
@@ -195,7 +197,7 @@ def extract_gpu(text: str) -> str | None:
     upper = text.upper()
     patterns = [
         (r"\bRTX\s*(5090|5080|5070|4070|4060|3090|3080|3070|3060|2080|2070|2060)\b", "RTX {}"),
-        (r"\bGTX\s*(1660\s*SUPER|1660|1650|1060|1050\s*TI)\b", "GTX {}"),
+        (r"\bGTX\s*(1660\s*SUPER|1660|1650|1060|970|1050\s*TI)\b", "GTX {}"),
         (r"\bRX\s*(7900\s*XTX|7800\s*XT|7700\s*XT|7600|6800\s*XT|6750\s*XT|6700\s*XT|6600|5700\s*XT)\b", "RX {}"),
         (r"\bRADEON\s*(780M)\b", "Radeon {}"),
         (r"\bARC\s*(A770|A750)\b", "Intel Arc {}"),
