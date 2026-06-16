@@ -8,7 +8,7 @@
     /\bmini\s*-?\s*pc\b/i,
     /\bminipc\b/i,
     /\bpc\s+(?:gamer|gaming|fixe|bureau|de\s+bureau|custom|assemble|assembl[ée]|mont[ée])\b/i,
-    /\bordinateur\s+(?:fixe|de\s+bureau|portable|gamer|gaming)\b/i,
+    /\bordinateur\s+(?:fixe|de\s+bureau|gamer|gaming)\b/i,
     /\b(?:tour|config|configuration)\s+(?:pc|gamer|gaming|fixe|compl[èe]te|complete)\b/i,
     /\b(?:nuc|optiplex|thinkcentre|prodesk|elitedesk|minisforum|beelink|geekom|gmktec|acemagic)\b/i,
   ];
@@ -22,6 +22,11 @@
     /\b(?:clavier|souris|[ée]cran|moniteur|enceinte|haut[ -]?parleur|casque|webcam|micro|tapis)\b/i,
     /\b(?:chargeur|alimentation|cable|câble|adaptateur|hub|dock|station\s+d'accueil)\b/i,
     /\b(?:carte\s+m[èe]re|processeur|cpu|carte\s+graphique|gpu|barrette|ram|ssd|nvme|hdd|disque\s+dur)\s+(?:seul|seule|uniquement|occasion|neuf|neuve)?\b/i,
+  ];
+  const LAPTOP_PATTERNS = [
+    /\b(?:pc|ordinateur)\s+portable\b/i,
+    /\b(?:portable|laptop|notebook|ultrabook|chromebook|macbook)\b/i,
+    /\b(?:thinkpad|ideapad|vivobook|zenbook|elitebook|probook|latitude|precision|inspiron|xps|surface\s+book|surface\s+laptop)\b/i,
   ];
 
   if (document.getElementById(ROOT_ID)) {
@@ -379,6 +384,10 @@
 
   function looksLikeComputerListing(text) {
     const normalized = clean(text);
+    if (LAPTOP_PATTERNS.some((pattern) => pattern.test(normalized))) {
+      return false;
+    }
+
     const hasPcSignal = PC_LISTING_PATTERNS.some((pattern) => pattern.test(normalized));
     const contextHits = PC_CONTEXT_PATTERNS.filter((pattern) => pattern.test(normalized)).length;
 
