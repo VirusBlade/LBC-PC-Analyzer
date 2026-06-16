@@ -205,6 +205,10 @@
   }
 
   function scanSearchResults() {
+    if (!isComputerCategoryPage()) {
+      return;
+    }
+
     const cards = findSearchCards().slice(0, MAX_SEARCH_BADGES);
     cards.forEach((card) => {
       if (scoredCards.has(card) || card.querySelector(".lbcmp-search-badge")) {
@@ -230,6 +234,10 @@
     });
 
     return cards;
+  }
+
+  function isComputerCategoryPage() {
+    return /\/c\/ordinateurs(?:\/|$)/.test(location.pathname);
   }
 
   function findCardContainer(link) {
