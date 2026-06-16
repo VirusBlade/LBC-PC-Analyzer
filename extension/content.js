@@ -248,7 +248,8 @@
 
   function buildTooltip(data) {
     const ramLabel = data.ram_gb ? `${data.ram_gb} Go RAM${data.ram_type ? ` ${data.ram_type}` : ""}${data.ram_speed_mhz ? ` ${data.ram_speed_mhz}MHz` : ""}` : null;
-    const parts = [data.verdict, data.cpu, data.gpu, ramLabel, data.storage_label, data.reason];
+    const cpuLabel = data.cpu ? `${data.cpu}${data.details?.cpu_year ? ` (${data.details.cpu_year})` : ""}` : null;
+    const parts = [data.verdict, cpuLabel, data.gpu, ramLabel, data.storage_label, data.reason];
     if (data.details) {
       parts.push(formatScoreDetails(data.details));
     }
@@ -276,20 +277,33 @@
     return source === "learned" ? "appris" : source === "benchmark" ? "benchmark" : source === "manual" ? "manuel" : source === "fallback" ? "estime" : null;
   }
 
-  function componentScoreHtml(kind, label, score, source) {
+  function toneClass(score) {
+    if (score === undefined || score === null) return "is-unknown";
+    if (score >= 82) return "is-great";
+    if (score >= 65) return "is-good";
+    if (score >= 45) return "is-mid";
+    return "is-bad";
+  }
+
+  function componentScoreHtml(kind, label, score, source, extraMeta) {
     if (!label) {
       return escapeHtml(kind === "gpu" ? "Aucun / inconnu" : "Inconnu");
     }
     const href = benchmarkUrl(kind, label);
     const sourceLabel = sourceLabelOf(source);
-    const meta = score === undefined || score === null ? "Score inconnu" : `${score}/100${sourceLabel ? ` · ${sourceLabel}` : ""}`;
+    const scoreLabel = score === undefined || score === null ? "Score inconnu" : `${score}/100`;
+    const meta = [scoreLabel, extraMeta, sourceLabel].filter(Boolean).join(" · ");
     return `
       <div class="lbcmp-component">
         <span class="lbcmp-component-name">${escapeHtml(label)}</span>
-        <span class="lbcmp-component-score">${escapeHtml(meta)}</span>
+        <span class="lbcmp-component-score ${toneClass(score)}">${escapeHtml(meta)}</span>
         <a class="lbcmp-benchmark-link" href="${escapeAttr(href)}" target="_blank" rel="noopener noreferrer">${kind === "gpu" ? "GPU Bench" : "CPU Bench"}</a>
       </div>
     `;
+  }
+
+  function metricHtml(value, score) {
+    return `<span class="lbcmp-metric ${toneClass(score)}">${escapeHtml(value)}</span>`;
   }
 
   function benchmarkUrl(kind, label) {
@@ -470,16 +484,17 @@
     const rows = [
       { label: "Marque", value: data.brand || "Inconnue" },
       { label: "Modele", value: data.model || "Inconnu" },
-      { label: "CPU", html: componentScoreHtml("cpu", data.cpu, data.details?.cpu_score, data.details?.cpu_score_source) },
+      { label: "CPU", html: componentScoreHtml("cpu", data.cpu, data.details?.cpu_score, data.details?.cpu_score_source, data.details?.cpu_year ? `${data.details.cpu_year}` : null) },
       { label: "GPU", html: data.gpu ? componentScoreHtml("gpu", data.gpu, data.details?.gpu_score, data.details?.gpu_score_source) : escapeHtml("Aucun / inconnu") },
-      { label: "RAM", value: data.ram_gb ? `${data.ram_gb} Go${data.ram_type ? ` ${data.ram_type}` : ""}${data.ram_speed_mhz ? ` ${data.ram_speed_mhz}MHz` : ""}` : "Inconnue" },
-      { label: "Disque", value: data.storage_label || "Inconnu" },
-      { label: "Score", value: `${data.score}/100` },
-      { label: "Verdict", value: data.verdict },
+      { label: "RAM", html: metricHtml(data.ram_gb ? `${data.ram_gb} Go${data.ram_type ? ` ${data.ram_type}` : ""}${data.ram_speed_mhz ? ` ${data.ram_speed_mhz}MHz` : ""}` : "Inconnue", data.details?.ram_score) },
+      { label: "Disque", html: metricHtml(data.storage_label || "Inconnu", data.details?.storage_score) },
+      { label: "Prix", html: metricHtml(data.price ? `${data.price} €` : "Inconnu", data.details?.price_score) },
+      { label: "Score", html: metricHtml(`${data.score}/100`, data.score) },
+      { label: "Verdict", html: metricHtml(data.verdict, data.score) },
     ];
 
     resultBox.innerHTML = `
-      <div class="lbcmp-score">${escapeHtml(data.score)}/100</div>
+      <div class="lbcmp-score ${toneClass(data.score)}">${escapeHtml(data.score)}/100</div>
       <dl>
         ${rows
           .map((row) => `<div><dt>${escapeHtml(row.label)}</dt><dd>${row.html || escapeHtml(row.value)}</dd></div>`)

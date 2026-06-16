@@ -1,30 +1,34 @@
 # LBC PC Analyzer
 
-Extension Chrome + backend FastAPI pour analyser localement les annonces Leboncoin de PC fixes, mini-PC et configurations avec GPU dedie.
+Extension Chrome + API Cloudflare Worker pour analyser les annonces Leboncoin de PC fixes, mini-PC et configurations avec GPU dedie.
 
-L'extension lit les annonces visibles, le backend extrait les composants avec des regex et une table CPU locale, puis calcule un score de rentabilite sur 100. Aucune IA externe n'est utilisee et rien n'est envoye hors de ta machine.
+L'extension lit les annonces visibles, l'API extrait les composants avec des regex et des tables CPU/GPU locales, puis calcule un score de rentabilite sur 100. Aucune IA n'est utilisee en V1 : le scoring repose sur des regles, des benchmarks locaux et un auto-apprentissage prudent via D1.
 
 ## Fonctionnalites
 
 - Extension Chrome Manifest V3 injectee sur `leboncoin.fr`.
 - Analyse automatique sur les pages annonce ordinateur/informatique.
 - Badges de score discrets sur les pages de recherche, avec tooltip au survol.
-- Encart detaille sur les pages annonce : marque, modele, CPU, GPU, RAM, stockage, score, verdict et raison.
+- Encart detaille sur les pages annonce : marque, modele, CPU, annee CPU, GPU, RAM, stockage, prix, score, verdict et raison.
+- Couleurs rapides sur les scores et composants pour reperer vite les bons/mauvais points.
 - Historique local des 20 dernieres analyses.
 - Favoris stockes dans `chrome.storage.local`.
-- Backend local FastAPI sur `http://localhost:8000`.
-- Scoring sans IA : regex + table CPU locale.
-- Apprentissage local SQLite pour reperer les CPU, marques et formats non reconnus.
+- API publique Cloudflare Worker sur `https://pc-analyzer-api.plaw.fr`.
+- D1 pour stocker les observations et les regles apprises.
+- Backend FastAPI local conserve pour le dev/test sur `http://localhost:8000`.
+- Scoring sans IA : regex + tables CPU/GPU locales + regles apprises.
 
 ## Architecture
 
 ```text
 backend/
   app/
-    main.py       API FastAPI
+    main.py       API FastAPI locale de dev
     parser.py     extraction marque, modele, CPU, RAM, stockage, prix
-    scoring.py    table CPU et calcul du score
-    learning.py   collecte locale et suggestions d'amelioration
+    scoring.py    tables fallback, annee CPU et calcul du score
+    learning.py   collecte locale SQLite et suggestions d'amelioration
+    cpu_benchmarks.json
+    gpu_benchmarks.json
   tests/
     test_parser.py
     test_learning.py
@@ -32,6 +36,24 @@ extension/
   manifest.json
   content.js
   styles.css
+worker/
+  src/index.ts    API publique Cloudflare Worker
+  migrations/     schema D1 observations + auto-apprentissage
+  wrangler.toml   domaine custom et cron toutes les 5 minutes
+.github/workflows/
+  deploy-api.yml  CI/CD Worker au push sur main
+```
+
+Architecture en production :
+
+```text
+Leboncoin -> Extension Chrome -> https://pc-analyzer-api.plaw.fr -> Cloudflare Worker -> D1
+```
+
+Architecture locale de dev :
+
+```text
+Leboncoin -> Extension Chrome -> http://localhost:8000 -> FastAPI -> SQLite locale
 ```
 
 ## Installation Backend
@@ -64,8 +86,21 @@ curl -X POST http://localhost:8000/analyze \
 2. Activer le mode developpeur.
 3. Cliquer sur **Charger l'extension non empaquetee**.
 4. Selectionner le dossier `extension`.
-5. Demarrer le backend sur `http://localhost:8000`.
-6. Ouvrir une recherche ou une annonce Leboncoin.
+5. Ouvrir une recherche ou une annonce Leboncoin.
+
+Par defaut, l'extension utilise l'API publique :
+
+```text
+https://pc-analyzer-api.plaw.fr
+```
+
+Pour basculer temporairement sur l'API FastAPI locale :
+
+```js
+chrome.storage.local.set({ lbcmp_api_base: "http://localhost:8000" })
+```
+
+Ensuite recharge l'extension et la page Leboncoin.
 
 Sur une page de recherche, les annonces detectees recoivent un badge `score/100`.
 Sur une page annonce, un encart complet apparait a droite.
@@ -86,7 +121,14 @@ Des ajustements sont appliques :
 - bonus pour RAM >= 32 Go ;
 - bonus pour SSD >= 512 Go.
 
-Les regex sont dans `backend/app/parser.py`. Le scoring utilise en priorite `backend/app/cpu_benchmarks.json`, puis les regles apprises SQLite, puis la table de fallback dans `backend/app/scoring.py`.
+Les regex sont dans `backend/app/parser.py` et `worker/src/index.ts`. Le scoring utilise en priorite les bases benchmark CPU/GPU, puis les regles apprises, puis les tables de fallback.
+
+Le detail renvoye par `/analyze` expose notamment :
+
+- `details.cpu_score` et `details.gpu_score` ;
+- `details.cpu_year` ;
+- `details.ram_score`, `details.storage_score`, `details.price_score` ;
+- `details.scoring_profile` : `compact_pc` ou `desktop_gpu`.
 
 ### Base CPU benchmark
 
@@ -226,26 +268,12 @@ Le detail est visible dans `details.brand_adjustment` et dans les raisons du sco
 
 ## API Cloudflare Worker + D1
 
-Une version hebergee de l'API est preparee dans `worker/` pour permettre une extension utilisable sans backend local.
+L'API principale est hebergee dans `worker/` pour permettre une extension utilisable sans backend local.
 
 Par defaut, l'extension utilise l'API Cloudflare publique :
 
 ```text
 https://pc-analyzer-api.plaw.fr
-```
-
-Pour repasser temporairement sur un backend local, tu peux surcharger l'URL dans le stockage de l'extension :
-
-```js
-chrome.storage.local.set({ lbcmp_api_base: "http://localhost:8000" })
-```
-
-Ensuite recharge l'extension et la page Leboncoin.
-
-Architecture cible :
-
-```text
-Extension Chrome -> Cloudflare Worker -> Cloudflare D1
 ```
 
 Commandes :

@@ -42,6 +42,40 @@ CPU_TABLE = {
     "AMD A10": 15,
 }
 
+CPU_RELEASE_YEARS = {
+    "Ryzen 7 H255": 2025,
+    "Ryzen 7 8745HS": 2024,
+    "Ryzen 7 8700G": 2024,
+    "Ryzen 7 7735HS": 2023,
+    "Ryzen 9 6900HX": 2022,
+    "Ryzen 7 6800U": 2022,
+    "Ryzen 7 5800H": 2021,
+    "Ryzen 7 5800U": 2021,
+    "Ryzen 7 5700U": 2021,
+    "Ryzen 7 5700X": 2022,
+    "Ryzen 5 5650GE": 2021,
+    "Ryzen 5 7430U": 2024,
+    "Ryzen 5 5500U": 2021,
+    "Intel i5-12400": 2022,
+    "Intel i5-1250P": 2022,
+    "Intel i5-1235U": 2022,
+    "Intel i5-1135G7": 2020,
+    "Intel i7-6700HQ": 2015,
+    "Intel i5-9500": 2019,
+    "Intel i5-7500": 2017,
+    "Intel i5-8500T": 2018,
+    "Intel i5-6500T": 2015,
+    "Intel i3-10th gen": 2020,
+    "Intel i5-10th gen": 2020,
+    "Intel i7-10th gen": 2020,
+    "Intel i3-7th gen": 2017,
+    "Intel N150": 2025,
+    "Intel N100": 2023,
+    "Intel N4000": 2017,
+    "Intel G630": 2011,
+    "AMD A10": 2012,
+}
+
 BRAND_ADJUSTMENTS = {
     "PC Custom": (0, "configuration assemblee"),
     "Lenovo": (5, "marque pro fiable"),
@@ -62,6 +96,70 @@ BRAND_ADJUSTMENTS = {
 }
 TRUSTED_BRANDS = {brand for brand, (delta, _reason) in BRAND_ADJUSTMENTS.items() if delta >= 4}
 PENALIZED_CPUS = {"Intel N100", "Intel N150", "Intel N4000", "Intel G630", "AMD A10", "Intel i5-8500T", "Intel i5-6500T", "Intel i3-7th gen"}
+
+
+def cpu_release_year(cpu: str | None, benchmark: dict[str, Any] | None = None) -> int | None:
+    if not cpu:
+        return None
+    if benchmark and benchmark.get("year"):
+        return int(benchmark["year"])
+    if cpu in CPU_RELEASE_YEARS:
+        return CPU_RELEASE_YEARS[cpu]
+    if cpu.startswith("Ryzen"):
+        return _ryzen_release_year(cpu)
+    if cpu.startswith("Intel i"):
+        return _intel_release_year(cpu)
+    if cpu.startswith("Intel N"):
+        return 2025 if cpu == "Intel N150" else 2023 if cpu == "Intel N100" else None
+    return None
+
+
+def _ryzen_release_year(cpu: str) -> int | None:
+    import re
+
+    match = re.search(r"\b(\d{4})", cpu)
+    if not match:
+        return None
+    number = int(match.group(1))
+    if number >= 8700:
+        return 2024
+    if number >= 7700:
+        return 2023
+    if number >= 6800:
+        return 2022
+    if number >= 5700:
+        return 2021
+    if number >= 5500:
+        return 2021
+    if number >= 3700:
+        return 2019
+    return None
+
+
+def _intel_release_year(cpu: str) -> int | None:
+    import re
+
+    gen_label = re.search(r"-(\d{1,2})th gen", cpu)
+    if gen_label:
+        generation = int(gen_label.group(1))
+    else:
+        model = re.search(r"-(\d{4,5})", cpu)
+        if not model:
+            return None
+        raw = model.group(1)
+        generation = int(raw[:2]) if len(raw) >= 5 else int(raw[0])
+
+    return {
+        14: 2023,
+        13: 2022,
+        12: 2022,
+        11: 2020,
+        10: 2020,
+        9: 2019,
+        8: 2018,
+        7: 2017,
+        6: 2015,
+    }.get(generation)
 
 
 def _ram_score(ram_gb: int | None, ram_type: str | None = None, ram_speed_mhz: int | None = None) -> int:
@@ -216,6 +314,7 @@ def score_listing(parsed: dict[str, Any], learned_cpu_scores: dict[str, int] | N
             "cpu_mark": benchmark.get("cpu_mark") if benchmark else None,
             "cpu_single_thread": benchmark.get("single_thread") if benchmark else None,
             "cpu_tier": benchmark.get("tier") if benchmark else None,
+            "cpu_year": cpu_release_year(cpu, benchmark),
             "gpu_score": gpu_score,
             "gpu_score_source": gpu_score_source,
             "gpu_tier": gpu_benchmark.get("tier") if gpu_benchmark else None,

@@ -68,6 +68,22 @@
   text-align: center;
 }
 
+.lbcmp-score.is-great {
+  background: #127a3d;
+}
+
+.lbcmp-score.is-good {
+  background: #2563eb;
+}
+
+.lbcmp-score.is-mid {
+  background: #b45309;
+}
+
+.lbcmp-score.is-bad {
+  background: #b42318;
+}
+
 .lbcmp-result dl {
   display: grid;
   gap: 7px;
@@ -283,6 +299,48 @@
   color: #334155;
   font-size: 12px;
   font-weight: 800;
+}
+
+.lbcmp-metric {
+  display: inline-flex;
+  width: fit-content;
+  max-width: 100%;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: #eef2f7;
+  color: #334155;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.lbcmp-component-score.is-great,
+.lbcmp-metric.is-great {
+  background: #e7f7ed;
+  color: #0f6934;
+}
+
+.lbcmp-component-score.is-good,
+.lbcmp-metric.is-good {
+  background: #eaf2ff;
+  color: #1d4ed8;
+}
+
+.lbcmp-component-score.is-mid,
+.lbcmp-metric.is-mid {
+  background: #fff4df;
+  color: #92400e;
+}
+
+.lbcmp-component-score.is-bad,
+.lbcmp-metric.is-bad {
+  background: #fff0ee;
+  color: #9f1d15;
+}
+
+.lbcmp-component-score.is-unknown,
+.lbcmp-metric.is-unknown {
+  background: #f2f4f7;
+  color: #667085;
 }
 
 .lbcmp-benchmark-link {

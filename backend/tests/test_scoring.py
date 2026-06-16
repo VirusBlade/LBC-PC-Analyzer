@@ -14,6 +14,7 @@ def test_scoring_uses_local_cpu_benchmark_details():
     assert result["details"]["cpu_score"] == 79
     assert result["details"]["cpu_score_source"] == "benchmark"
     assert result["details"]["cpu_mark"] is not None
+    assert result["details"]["cpu_year"] == 2021
 
 
 def test_learned_cpu_score_overrides_benchmark_when_present():
@@ -71,3 +72,13 @@ def test_scoring_uses_ryzen_5700x_benchmark():
     assert parsed["cpu"] == "Ryzen 7 5700X"
     assert result["details"]["cpu_score"] == 86
     assert result["details"]["cpu_score_source"] == "benchmark"
+    assert result["details"]["cpu_year"] == 2022
+
+
+def test_scoring_infers_year_for_learned_cpu():
+    parsed = {"cpu": "Ryzen 7 3700X", "ram_gb": 16, "storage_gb": 512, "storage_type": "SSD", "price": 300}
+
+    result = score_listing(parsed, learned_cpu_scores={"Ryzen 7 3700X": 60})
+
+    assert result["details"]["cpu_score_source"] == "learned"
+    assert result["details"]["cpu_year"] == 2019
