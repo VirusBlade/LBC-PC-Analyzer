@@ -44,14 +44,15 @@ export default {
       if (url.pathname === "/learning/stats") return json(await learningStats(env));
       if (url.pathname === "/learning/examples") return json(await learningExamples(env, url.searchParams.get("flag"), Number(url.searchParams.get("limit") || 30)));
       if (url.pathname === "/learning/rules") return json(await learningRules(env));
-      if (url.pathname === "/learning/auto-run" && ["GET", "POST"].includes(request.method)) return json(await autoLearn(env));
+      if (url.pathname === "/learning/auto-runs") return json(await learningRuns(env));
+      if (url.pathname === "/learning/auto-run" && ["GET", "POST"].includes(request.method)) return json(await runAutoLearn(env));
       return json({ error: "Not found" }, 404);
     } catch (error) {
       return json({ error: error instanceof Error ? error.message : "Internal error" }, 500);
     }
   },
   async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
-    ctx.waitUntil(autoLearn(env));
+    ctx.waitUntil(runAutoLearn(env));
   },
 };
 async function analyze(request: Request, env: Env): Promise<Response> { const payload = await request.json<AnalyzeRequest>(); let parsed = parseListing(payload.title || "", payload.price ?? null, payload.description || ""); parsed = await applyLearnedRules(env, parsed, `${payload.title || ""} ${payload.description || ""}`); const result = scoreListing(parsed, await learnedScores(env)); const full = { ...parsed, ...result }; await recordObservation(env, payload, full, payload.url || null); return json(full); }
@@ -110,7 +111,18 @@ type ParsedObservation = { cpu?: string | null; gpu?: string | null; brand?: str
 
 const MIN_CPU_OCCURRENCES = 2;
 const MIN_GPU_OCCURRENCES = 2;
-const MIN_BRAND_OCCURRENCES = 3;
+
+async function runAutoLearn(env: Env) {
+  try {
+    const result = await autoLearn(env);
+    await recordAutoLearnRun(env, result.scanned, result.written, null, result);
+    return result;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown auto-learn error";
+    await recordAutoLearnRun(env, 0, 0, message, null);
+    throw error;
+  }
+}
 
 async function autoLearn(env: Env) {
   const rows = ((await env.DB.prepare("SELECT title, description, parsed_json, flags FROM observations ORDER BY id DESC LIMIT 300").all()).results || []) as ObservationRow[];
@@ -130,9 +142,8 @@ async function autoLearn(env: Env) {
     if (flags.includes("unknown_gpu_score") || !parsed.gpu) {
       for (const candidate of candidateGpus(text)) bump(gpuBucket, candidate);
     }
-    if (flags.includes("missing_brand") || !parsed.brand) {
-      for (const candidate of candidateBrands(text)) bump(brandBucket, candidate);
-    }
+    // Brand learning is intentionally disabled for now: free-text Leboncoin cards
+    // mostly surface cities, seller labels, categories, and component names.
   }
 
   const learned = { cpu: [] as Array<Record<string, unknown>>, gpu: [] as Array<Record<string, unknown>>, brand: [] as Array<Record<string, unknown>> };
@@ -156,32 +167,39 @@ async function autoLearn(env: Env) {
     learned.gpu.push({ pattern: item.value.toUpperCase(), label, score, count: item.count });
   }
 
-  for (const item of topCandidates(brandBucket, 30)) {
-    if (item.count < MIN_BRAND_OCCURRENCES) continue;
-    const label = normalizeBrandLabel(item.value);
-    if (!label || BRANDS.some((brand) => brand.toUpperCase() === label.toUpperCase()) || label === CUSTOM_PC_BRAND) continue;
-    statements.push(env.DB.prepare("INSERT INTO learned_brand (pattern, label, seen_count) VALUES (?, ?, ?) ON CONFLICT(pattern) DO UPDATE SET label = excluded.label, seen_count = excluded.seen_count, updated_at = CURRENT_TIMESTAMP").bind(label.toUpperCase(), label, item.count));
-    learned.brand.push({ pattern: label.toUpperCase(), label, count: item.count });
-  }
+  const candidates = {
+    cpu: topCandidates(cpuBucket, 10),
+    gpu: topCandidates(gpuBucket, 10),
+    brand: [],
+  };
 
   if (statements.length) await env.DB.batch(statements);
-  return { scanned: rows.length, written: statements.length, learned };
+  return { scanned: rows.length, written: statements.length, candidates, learned };
+}
+
+async function recordAutoLearnRun(env: Env, scanned: number, written: number, error: string | null, result: unknown): Promise<void> {
+  await env.DB.prepare("INSERT INTO auto_learn_runs (scanned, written, error, result_json) VALUES (?, ?, ?, ?)").bind(scanned, written, error, result ? JSON.stringify(result).slice(0, 4000) : null).run();
+}
+
+async function learningRuns(env: Env) {
+  const runs = await env.DB.prepare("SELECT id, scanned, written, error, result_json, created_at FROM auto_learn_runs ORDER BY id DESC LIMIT 20").all();
+  return { runs: runs.results || [] };
 }
 
 function candidateCpus(text: string): string[] {
   const upper = text.toUpperCase().replace(/[._/-]+/g, " ").replace(/\s+/g, " ");
-  const patterns = [/RYZEN\s+[3579]\s+(?:\d{4}|H\s*\d{3})[A-Z]{0,2}/g, /I[3579]\s*\d{4,5}[A-Z]{0,2}/g, /INTEL\s+I[3579]\s*\d{4,5}[A-Z]{0,2}/g, /I[3579]\s*\d{1,2}(?:TH)?\s*GEN/g, /N\d{3,4}/g, /(?:CELERON|PENTIUM)\s+[A-Z]?\d{3,5}/g];
+  const patterns = [/\bRYZEN\s+[3579]\s+(?:\d{4}|H\s*\d{3})[A-Z]{0,2}\b/g, /\bI[3579]\s*\d{4,5}[A-Z]{0,2}\b/g, /\bINTEL\s+I[3579]\s*\d{4,5}[A-Z]{0,2}\b/g, /\bI[3579]\s*\d{1,2}(?:TH)?\s*GEN\b/g, /\bN\d{3,4}\b/g, /\b(?:CELERON|PENTIUM)\s+[A-Z]?\d{3,5}\b/g];
   return collectMatches(upper, patterns);
 }
 
 function candidateGpus(text: string): string[] {
   const upper = text.toUpperCase().replace(/[._/-]+/g, " ").replace(/\s+/g, " ");
-  const patterns = [/RTX\s*(?:PRO\s*)?\d{4}(?:\s*SUPER|\s*TI)?/g, /GTX\s*\d{4}(?:\s*SUPER|\s*TI)?/g, /RX\s*\d{4}(?:\s*XT|\s*XTX)?/g, /RADEON\s*\d{3,4}M/g, /ARC\s*A\d{3,4}/g];
+  const patterns = [/\bRTX\s*(?:PRO\s*)?\d{4}(?:\s*SUPER|\s*TI)?\b/g, /\bGTX\s*\d{4}(?:\s*SUPER|\s*TI)?\b/g, /\bRX\s*\d{4}(?:\s*XT|\s*XTX)?\b/g, /\bRADEON\s*\d{3,4}M\b/g, /\bARC\s*A\d{3,4}\b/g];
   return collectMatches(upper, patterns);
 }
 
 function candidateBrands(text: string): string[] {
-  const found = text.match(/[A-Z][A-Za-z0-9]{2,}(?:\s+[A-Z][A-Za-z0-9]{1,}){0,2}/g) || [];
+  const found = text.match(/\b[A-Z][A-Za-z0-9]{2,}(?:\s+[A-Z][A-Za-z0-9]{1,}){0,2}\b/g) || [];
   const stop = new Set(["Prix", "France", "Windows", "Livraison", "Annonce", "Ordinateurs", "Categorie", "Catégorie", "Deja Vu", "Déjà Vu", "Tres bon", "Très bon"]);
   return found.map((item) => item.trim()).filter((item) => !stop.has(item) && !/\d/.test(item)).slice(0, 20);
 }
@@ -194,17 +212,17 @@ function collectMatches(text: string, patterns: RegExp[]): string[] {
 
 function normalizeCpuLabel(value: string): string | null {
   const upper = value.toUpperCase().replace(/[.-]+/g, " ").replace(/\s+/g, " ").trim();
-  const ryzen = upper.match(/RYZEN\s+([3579])\s+((?:\d{4}|H\s*\d{3})[A-Z]{0,2})/);
+  const ryzen = upper.match(/\bRYZEN\s+([3579])\s+((?:\d{4}|H\s*\d{3})[A-Z]{0,2})\b/);
   if (ryzen) return `Ryzen ${ryzen[1]} ${ryzen[2].replace(/\s/g, "")}`;
-  const intelCore = upper.match(/(?:INTEL\s*)?I([3579])\s*(\d{4,5}[A-Z]{0,2})/);
+  const intelCore = upper.match(/\b(?:INTEL\s*)?I([3579])\s*(\d{4,5}[A-Z]{0,2})\b/);
   if (intelCore) return `Intel i${intelCore[1]}-${intelCore[2]}`;
-  const intelGen = upper.match(/I([3579])\s*(\d{1,2})(?:TH)?\s*GEN/);
+  const intelGen = upper.match(/\bI([3579])\s*(\d{1,2})(?:TH)?\s*GEN\b/);
   if (intelGen) return `Intel i${intelGen[1]}-${intelGen[2]}th gen`;
-  const intelN = upper.match(/N(\d{3,4})/);
+  const intelN = upper.match(/\bN(\d{3,4})\b/);
   if (intelN) return `Intel N${intelN[1]}`;
-  const celeron = upper.match(/CELERON\s+([A-Z]?\d{3,5})/);
+  const celeron = upper.match(/\bCELERON\s+([A-Z]?\d{3,5})\b/);
   if (celeron) return `Intel Celeron ${celeron[1]}`;
-  const pentium = upper.match(/PENTIUM\s+([A-Z]?\d{3,5})/);
+  const pentium = upper.match(/\bPENTIUM\s+([A-Z]?\d{3,5})\b/);
   if (pentium) return `Intel Pentium ${pentium[1]}`;
   return null;
 }
@@ -244,15 +262,15 @@ function estimateCpuScore(label: string): number | null {
 
 function normalizeGpuLabel(value: string): string | null {
   const upper = value.toUpperCase().replace(/[-_]+/g, " ").replace(/\s+/g, " ").trim();
-  const rtx = upper.match(/RTX\s*(?:PRO\s*)?(\d{4})(?:\s*(SUPER|TI))?/);
+  const rtx = upper.match(/\bRTX\s*(?:PRO\s*)?(\d{4})(?:\s*(SUPER|TI))?\b/);
   if (rtx) return `RTX ${rtx[1]}${rtx[2] ? ` ${rtx[2]}` : ""}`;
-  const gtx = upper.match(/GTX\s*(\d{4})(?:\s*(SUPER|TI))?/);
+  const gtx = upper.match(/\bGTX\s*(\d{4})(?:\s*(SUPER|TI))?\b/);
   if (gtx) return `GTX ${gtx[1]}${gtx[2] ? ` ${gtx[2]}` : ""}`;
-  const rx = upper.match(/RX\s*(\d{4})(?:\s*(XT|XTX))?/);
+  const rx = upper.match(/\bRX\s*(\d{4})(?:\s*(XT|XTX))?\b/);
   if (rx) return `RX ${rx[1]}${rx[2] ? ` ${rx[2]}` : ""}`;
-  const arc = upper.match(/ARC\s*(A\d{3,4})/);
+  const arc = upper.match(/\bARC\s*(A\d{3,4})\b/);
   if (arc) return `Intel Arc ${arc[1]}`;
-  const radeon = upper.match(/RADEON\s*(\d{3,4}M)/);
+  const radeon = upper.match(/\bRADEON\s*(\d{3,4}M)\b/);
   if (radeon) return `Radeon ${radeon[1]}`;
   return null;
 }
