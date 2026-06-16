@@ -1,0 +1,16 @@
+name = "lbc-pc-analyzer-api"
+main = "src/index.ts"
+compatibility_date = "2026-06-15"
+workers_dev = false
+preview_urls = false
+
+[observability]
+enabled = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "lbc_pc"
+database_id = "50760761-f9fd-4088-86c8-b23d33bca3f5"
+
+[triggers]
+crons = ["*/5 * * * *"]

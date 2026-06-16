@@ -336,3 +336,5 @@ Le deploiement cible le domaine custom configure dans `worker/wrangler.toml` :
 ```text
 pc-analyzer-api.plaw.fr
 ```
+
+Le workflow CI utilise `worker/wrangler.ci.toml`, qui ne redeclare pas la route custom. La route reste geree dans Cloudflare, et le token GitHub n'a donc pas besoin de modifier les routes a chaque push.
