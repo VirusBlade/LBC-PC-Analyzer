@@ -4,19 +4,24 @@
   const FAVORITES_KEY = "lbcmp_favorites";
   const MAX_HISTORY = 20;
   const MAX_SEARCH_BADGES = 12;
-  const COMPUTER_HINTS = [
-    "ordinateur",
-    "informatique",
-    "mini pc",
-    "minipc",
-    "pc de bureau",
-    "pc portable",
-    "hardware",
-    "processeur",
-    "ryzen",
-    "intel",
-    "ssd",
-    "ram",
+  const PC_LISTING_PATTERNS = [
+    /\bmini\s*-?\s*pc\b/i,
+    /\bminipc\b/i,
+    /\bpc\s+(?:gamer|gaming|fixe|bureau|de\s+bureau|custom|assemble|assembl[ée]|mont[ée])\b/i,
+    /\bordinateur\s+(?:fixe|de\s+bureau|portable|gamer|gaming)\b/i,
+    /\b(?:tour|config|configuration)\s+(?:pc|gamer|gaming|fixe|compl[èe]te|complete)\b/i,
+    /\b(?:nuc|optiplex|thinkcentre|prodesk|elitedesk|minisforum|beelink|geekom|gmktec|acemagic)\b/i,
+  ];
+  const PC_CONTEXT_PATTERNS = [
+    /\b(?:ryzen|intel\s+core|i[3579][\s-]?\d{4,5}|n100|n150)\b/i,
+    /\b(?:rtx|gtx|radeon\s+rx|rx\s*\d{4}|intel\s+arc)\b/i,
+    /\b\d{1,3}\s*(?:go|gb)\s+(?:ram|ddr[345])\b/i,
+    /\b(?:ssd|nvme|hdd)\b/i,
+  ];
+  const ACCESSORY_ONLY_PATTERNS = [
+    /\b(?:clavier|souris|[ée]cran|moniteur|enceinte|haut[ -]?parleur|casque|webcam|micro|tapis)\b/i,
+    /\b(?:chargeur|alimentation|cable|câble|adaptateur|hub|dock|station\s+d'accueil)\b/i,
+    /\b(?:carte\s+m[èe]re|processeur|cpu|carte\s+graphique|gpu|barrette|ram|ssd|nvme|hdd|disque\s+dur)\s+(?:seul|seule|uniquement|occasion|neuf|neuve)?\b/i,
   ];
 
   if (document.getElementById(ROOT_ID)) {
@@ -365,8 +370,23 @@
   }
 
   function looksLikeComputerListing(text) {
-    const lower = text.toLowerCase();
-    return COMPUTER_HINTS.some((hint) => lower.includes(hint));
+    const normalized = clean(text);
+    const hasPcSignal = PC_LISTING_PATTERNS.some((pattern) => pattern.test(normalized));
+    const contextHits = PC_CONTEXT_PATTERNS.filter((pattern) => pattern.test(normalized)).length;
+
+    if (hasPcSignal) {
+      return true;
+    }
+
+    if (contextHits >= 3 && /\b(?:windows|wifi|bluetooth|tour|bo[iî]tier|alimentation|ventilo|ventilateur)\b/i.test(normalized)) {
+      return true;
+    }
+
+    if (ACCESSORY_ONLY_PATTERNS.some((pattern) => pattern.test(normalized)) && contextHits < 3) {
+      return false;
+    }
+
+    return false;
   }
 
   function extractListing() {
