@@ -339,11 +339,12 @@
     const sourceLabel = sourceLabelOf(source);
     const scoreLabel = score === undefined || score === null ? "Score inconnu" : `${score}/100`;
     const meta = [scoreLabel, extraMeta, sourceLabel].filter(Boolean).join(" · ");
+    const benchmarkLink = href ? `<a class="lbcmp-benchmark-link" href="${escapeAttr(href)}" target="_blank" rel="noopener noreferrer">${kind === "gpu" ? "GPU Bench" : "CPU Bench"}</a>` : "";
     return `
       <div class="lbcmp-component">
         <span class="lbcmp-component-name">${escapeHtml(label)}</span>
         <span class="lbcmp-component-score ${toneClass(score)}">${escapeHtml(meta)}</span>
-        <a class="lbcmp-benchmark-link" href="${escapeAttr(href)}" target="_blank" rel="noopener noreferrer">${kind === "gpu" ? "GPU Bench" : "CPU Bench"}</a>
+        ${benchmarkLink}
       </div>
     `;
   }
@@ -353,6 +354,9 @@
   }
 
   function benchmarkUrl(kind, label) {
+    if (!label || /\bunknown\b/i.test(label)) {
+      return null;
+    }
     const query = encodeURIComponent(label);
     if (kind === "gpu") {
       return `https://www.videocardbenchmark.net/gpu.php?gpu=${query}`;
