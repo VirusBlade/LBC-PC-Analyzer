@@ -28,6 +28,7 @@
   let scanTimer = null;
   const scoredCards = new WeakSet();
   let activePanel = "history";
+  let extensionContextAlive = true;
 
   const root = document.createElement("aside");
   root.id = ROOT_ID;
@@ -75,11 +76,16 @@
   window.addEventListener("hashchange", scheduleScan);
 
   function scheduleScan() {
+    if (!extensionContextAlive) return;
     clearTimeout(scanTimer);
     scanTimer = setTimeout(scanCurrentPage, 700);
   }
 
   async function scanCurrentPage() {
+    if (!extensionContextAlive) {
+      return;
+    }
+
     if (!isAdPage()) {
       root.hidden = true;
       scanSearchResults();
@@ -128,18 +134,26 @@
   }
 
   async function analyzePayload(payload) {
-    if (!chrome?.runtime?.sendMessage) {
+    if (!isExtensionContextReady()) {
       throw new Error("Extension non disponible. Recharge l'extension Chrome.");
     }
 
     const response = await new Promise((resolve, reject) => {
-      chrome.runtime.sendMessage({ type: "LBCPC_ANALYZE", payload }, (reply) => {
-        if (chrome.runtime.lastError) {
-          reject(new Error(chrome.runtime.lastError.message));
-          return;
+      try {
+        chrome.runtime.sendMessage({ type: "LBCPC_ANALYZE", payload }, (reply) => {
+          const runtimeError = chrome.runtime.lastError;
+          if (runtimeError) {
+            reject(extensionError(runtimeError.message));
+            return;
+          }
+          resolve(reply);
+        });
+      } catch (error) {
+        if (isExtensionContextError(error)) {
+          markExtensionContextInvalid();
         }
-        resolve(reply);
-      });
+        reject(error);
+      }
     });
 
     if (!response?.ok) {
@@ -147,6 +161,38 @@
     }
 
     return response.data;
+  }
+
+  function isExtensionContextReady() {
+    try {
+      return extensionContextAlive && Boolean(chrome?.runtime?.id && chrome?.runtime?.sendMessage && chrome?.storage?.local);
+    } catch (_error) {
+      markExtensionContextInvalid();
+      return false;
+    }
+  }
+
+  function extensionError(message) {
+    const error = new Error(message || "Extension non disponible. Recharge l'extension Chrome.");
+    if (isExtensionContextError(error)) {
+      markExtensionContextInvalid();
+    }
+    return error;
+  }
+
+  function isExtensionContextError(error) {
+    return /extension context invalidated|context invalidated|message port closed|receiving end does not exist/i.test(String(error?.message || error || ""));
+  }
+
+  function markExtensionContextInvalid() {
+    if (!extensionContextAlive) return;
+    extensionContextAlive = false;
+    clearTimeout(scanTimer);
+    observer.disconnect();
+    status.textContent = "Extension rechargee. Recharge la page Leboncoin.";
+    resultBox.innerHTML = "<p>Chrome a recharge l'extension. Recharge cette page pour reinjecter l'analyse.</p>";
+    resultBox.hidden = false;
+    actions.hidden = true;
   }
 
   function isAdPage() {
@@ -450,13 +496,51 @@
 
   function loadList(key) {
     return new Promise((resolve) => {
-      chrome.storage.local.get({ [key]: [] }, (data) => resolve(Array.isArray(data[key]) ? data[key] : []));
+      if (!isExtensionContextReady()) {
+        resolve([]);
+        return;
+      }
+
+      try {
+        chrome.storage.local.get({ [key]: [] }, (data) => {
+          const runtimeError = chrome.runtime.lastError;
+          if (runtimeError) {
+            extensionError(runtimeError.message);
+            resolve([]);
+            return;
+          }
+          resolve(Array.isArray(data[key]) ? data[key] : []);
+        });
+      } catch (error) {
+        if (isExtensionContextError(error)) {
+          markExtensionContextInvalid();
+        }
+        resolve([]);
+      }
     });
   }
 
   function saveList(key, value) {
     return new Promise((resolve) => {
-      chrome.storage.local.set({ [key]: value }, resolve);
+      if (!isExtensionContextReady()) {
+        resolve();
+        return;
+      }
+
+      try {
+        chrome.storage.local.set({ [key]: value }, () => {
+          const runtimeError = chrome.runtime.lastError;
+          if (runtimeError) {
+            extensionError(runtimeError.message);
+          }
+          resolve();
+        });
+      } catch (error) {
+        if (isExtensionContextError(error)) {
+          markExtensionContextInvalid();
+        }
+        resolve();
+      }
     });
   }
 
