@@ -42,6 +42,18 @@ def test_parse_desktop_pc_with_radeon_rx_6750_xt():
     assert parsed["storage_gb"] == 1024
 
 
+def test_parse_desktop_pc_with_radeon_rx_5700_xt_without_space():
+    parsed = parse_listing(
+        "PC gamer Ryzen 5 5600 16 Go DDR4",
+        "500 €",
+        "Carte graphique : Radeon RX 5700XT 8go, SSD 1To.",
+    )
+
+    assert parsed["gpu"] == "RX 5700 XT"
+    assert parsed["ram_gb"] == 16
+    assert parsed["storage_gb"] == 1024
+
+
 def test_custom_pc_does_not_use_motherboard_brand():
     parsed = parse_listing(
         "PC custom Ryzen 5 5600 RX 6750 XT 32 Go",

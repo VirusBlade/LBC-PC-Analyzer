@@ -190,7 +190,7 @@ def extract_gpu(text: str) -> str | None:
     patterns = [
         (r"\bRTX\s*(5090|5080|5070|4070|4060|3090|3080|3070|3060|2080|2070|2060)\b", "RTX {}"),
         (r"\bGTX\s*(1660\s*SUPER|1660|1650|1050\s*TI)\b", "GTX {}"),
-        (r"\bRX\s*(7900\s*XTX|7800\s*XT|7700\s*XT|7600|6800\s*XT|6750\s*XT|6700\s*XT|6600)\b", "RX {}"),
+        (r"\bRX\s*(7900\s*XTX|7800\s*XT|7700\s*XT|7600|6800\s*XT|6750\s*XT|6700\s*XT|6600|5700\s*XT)\b", "RX {}"),
         (r"\bRADEON\s*(780M)\b", "Radeon {}"),
         (r"\bARC\s*(A770|A750)\b", "Intel Arc {}"),
     ]
