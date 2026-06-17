@@ -7,6 +7,7 @@ from .benchmarks import cpu_score_from_benchmark, gpu_score_from_benchmark
 
 CPU_TABLE = {
     "Ryzen 7 H255": 98,
+    "Ryzen 7 9700X": 91,
     "Ryzen 7 8745HS": 98,
     "Ryzen 7 8700G": 96,
     "Ryzen 7 7735HS": 92,
@@ -46,6 +47,7 @@ CPU_TABLE = {
 
 CPU_RELEASE_YEARS = {
     "Ryzen 7 H255": 2025,
+    "Ryzen 7 9700X": 2024,
     "Ryzen 7 8745HS": 2024,
     "Ryzen 7 8700G": 2024,
     "Ryzen 7 7735HS": 2023,

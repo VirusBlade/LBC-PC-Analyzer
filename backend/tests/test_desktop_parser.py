@@ -121,6 +121,25 @@ def test_parse_old_gamer_tower_i7_4790k_gtx_970():
     assert parsed["storage_type"] == "HDD"
 
 
+def test_parse_high_end_ryzen_9700x_rx_9070xt_without_rx_prefix():
+    parsed = parse_listing(
+        "PC gamer Ryzen 7 9700X 9070XT",
+        "",
+        """
+        PC gamer équipé d'une 9070Xt édition steel legend, ryzen 7 9700x,
+        16g DDR5, carte mère B850 M steel legend, 1to de stockage ssd,
+        boîtier mini ATX, alimentation 750 w.
+        """,
+    )
+
+    assert parsed["brand"] == "PC Custom"
+    assert parsed["cpu"] == "Ryzen 7 9700X"
+    assert parsed["gpu"] == "RX 9070 XT"
+    assert parsed["ram_gb"] == 16
+    assert parsed["ram_type"] == "DDR5"
+    assert parsed["storage_label"] == "SSD 1 To"
+
+
 def test_custom_pc_does_not_use_motherboard_brand():
     parsed = parse_listing(
         "PC custom Ryzen 5 5600 RX 6750 XT 32 Go",
