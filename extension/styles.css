@@ -103,6 +103,7 @@
 }
 
 .lbcmp-result dd {
+  min-width: 0;
   margin: 0;
   color: #121926;
   font-weight: 700;
@@ -285,7 +286,15 @@
 
 .lbcmp-component {
   display: grid;
-  gap: 5px;
+  gap: 4px;
+  min-width: 0;
+}
+
+.lbcmp-component-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 8px;
   min-width: 0;
 }
 
@@ -294,7 +303,7 @@
   color: #121926;
   font-weight: 800;
   line-height: 1.2;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 
 .lbcmp-component-score {
