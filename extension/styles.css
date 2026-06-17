@@ -94,6 +94,7 @@
   display: grid;
   grid-template-columns: 92px 1fr;
   gap: 8px;
+  align-items: start;
 }
 
 .lbcmp-result dt {
@@ -284,21 +285,49 @@
 
 .lbcmp-component {
   display: grid;
-  gap: 5px;
+  gap: 4px;
+  max-width: 100%;
+  padding: 7px 8px;
+  border: 1px solid #e7ebf0;
+  border-radius: 6px;
+  background: #fbfcfe;
+}
+
+.lbcmp-component-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
 }
 
 .lbcmp-component-name {
+  min-width: 0;
+  color: #121926;
   font-weight: 800;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
 }
 
 .lbcmp-component-score {
   width: fit-content;
+  white-space: nowrap;
   padding: 3px 7px;
   border-radius: 999px;
   background: #eef2f7;
   color: #334155;
   font-size: 12px;
   font-weight: 800;
+}
+
+.lbcmp-component-sub {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  color: #667085;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.2;
 }
 
 .lbcmp-metric {
@@ -345,7 +374,7 @@
 
 .lbcmp-benchmark-link {
   color: #b54000;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 800;
   text-decoration: underline;
   text-underline-offset: 2px;

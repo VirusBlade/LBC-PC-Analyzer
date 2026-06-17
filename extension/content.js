@@ -356,13 +356,18 @@
     const href = benchmarkUrl(kind, label);
     const sourceLabel = sourceLabelOf(source);
     const scoreLabel = score === undefined || score === null ? "Score inconnu" : `${score}/100`;
-    const meta = [scoreLabel, extraMeta, sourceLabel].filter(Boolean).join(" · ");
-    const benchmarkLink = href ? `<a class="lbcmp-benchmark-link" href="${escapeAttr(href)}" target="_blank" rel="noopener noreferrer">${kind === "gpu" ? "GPU Bench" : "CPU Bench"}</a>` : "";
+    const meta = [extraMeta, sourceLabel].filter(Boolean).join(" · ");
+    const benchmarkLink = href ? `<a class="lbcmp-benchmark-link" href="${escapeAttr(href)}" target="_blank" rel="noopener noreferrer">Bench</a>` : "";
     return `
       <div class="lbcmp-component">
-        <span class="lbcmp-component-name">${escapeHtml(label)}</span>
-        <span class="lbcmp-component-score ${toneClass(score)}">${escapeHtml(meta)}</span>
-        ${benchmarkLink}
+        <div class="lbcmp-component-main">
+          <span class="lbcmp-component-name">${escapeHtml(label)}</span>
+          <span class="lbcmp-component-score ${toneClass(score)}">${escapeHtml(scoreLabel)}</span>
+        </div>
+        <div class="lbcmp-component-sub">
+          ${meta ? `<span>${escapeHtml(meta)}</span>` : ""}
+          ${benchmarkLink}
+        </div>
       </div>
     `;
   }
