@@ -97,11 +97,6 @@
   align-items: start;
 }
 
-.lbcmp-result dl div.lbcmp-row-rich {
-  grid-template-columns: 1fr;
-  gap: 5px;
-}
-
 .lbcmp-result dt {
   color: #667085;
   font-weight: 700;
@@ -290,20 +285,8 @@
 
 .lbcmp-component {
   display: grid;
-  gap: 4px;
-  width: 100%;
-  max-width: 100%;
-  padding: 8px 9px;
-  border: 1px solid #e7ebf0;
-  border-radius: 6px;
-  background: #fbfcfe;
-}
-
-.lbcmp-component-main {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 8px;
+  gap: 5px;
+  min-width: 0;
 }
 
 .lbcmp-component-name {
@@ -329,7 +312,7 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   color: #667085;
   font-size: 11px;
   font-weight: 800;

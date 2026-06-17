@@ -360,11 +360,9 @@
     const benchmarkLink = href ? `<a class="lbcmp-benchmark-link" href="${escapeAttr(href)}" target="_blank" rel="noopener noreferrer">Bench</a>` : "";
     return `
       <div class="lbcmp-component">
-        <div class="lbcmp-component-main">
-          <span class="lbcmp-component-name">${escapeHtml(label)}</span>
-          <span class="lbcmp-component-score ${toneClass(score)}">${escapeHtml(scoreLabel)}</span>
-        </div>
+        <span class="lbcmp-component-name">${escapeHtml(label)}</span>
         <div class="lbcmp-component-sub">
+          <span class="lbcmp-component-score ${toneClass(score)}">${escapeHtml(scoreLabel)}</span>
           ${meta ? `<span>${escapeHtml(meta)}</span>` : ""}
           ${benchmarkLink}
         </div>
@@ -627,7 +625,7 @@
       <div class="lbcmp-score ${toneClass(data.score)}">${escapeHtml(data.score)}/100</div>
       <dl>
         ${rows
-          .map((row) => `<div class="${row.html ? "lbcmp-row-rich" : ""}"><dt>${escapeHtml(row.label)}</dt><dd>${row.html || escapeHtml(row.value)}</dd></div>`)
+          .map((row) => `<div><dt>${escapeHtml(row.label)}</dt><dd>${row.html || escapeHtml(row.value)}</dd></div>`)
           .join("")}
       </dl>
       ${data.details ? `<div class="lbcmp-breakdown">${escapeHtml(formatScoreDetails(data.details))}</div>` : ""}
