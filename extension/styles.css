@@ -90,7 +90,7 @@
   margin: 0;
 }
 
-.lbcmp-result dl div {
+.lbcmp-result dl > div {
   display: grid;
   grid-template-columns: 92px 1fr;
   gap: 8px;
