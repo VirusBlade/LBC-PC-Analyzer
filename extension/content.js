@@ -6,6 +6,7 @@
   const MAX_SEARCH_BADGES = 12;
   const PC_LISTING_PATTERNS = [
     /\bmini\s*-?\s*pc\b/i,
+    /\bmini\s*-?\s*ordinateur\b/i,
     /\bminipc\b/i,
     /\bpc\s+(?:gamer|gaming|fixe|bureau|de\s+bureau|custom|assemble|assembl[ée]|mont[ée])\b/i,
     /\bordinateur\s+(?:fixe|de\s+bureau|gamer|gaming)\b/i,
